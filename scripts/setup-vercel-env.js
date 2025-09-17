@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+
+/**
+ * Script para configurar variáveis de ambiente no Vercel
+ * Execute: node scripts/setup-vercel-env.js
+ */
+
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Lê o arquivo .env.local
+const envLocalPath = path.join(__dirname, '..', '.env.local')
+
+if (!fs.existsSync(envLocalPath)) {
+  console.error('❌ Arquivo .env.local não encontrado!')
+  process.exit(1)
+}
+
+const envContent = fs.readFileSync(envLocalPath, 'utf8')
+const envLines = envContent.split('\n').filter(line => line.trim() && !line.startsWith('#'))
+
+console.log('🔧 Configuração necessária no Vercel:')
+console.log('\n📋 Copie e cole estas variáveis no painel do Vercel:')
+console.log('\n' + '='.repeat(60))
+
+envLines.forEach(line => {
+  const [key, value] = line.split('=')
+  if (key && value) {
+    console.log(`${key}=${value}`)
+  }
+})
+
+console.log('='.repeat(60))
+console.log('\n📝 Passos para configurar no Vercel:')
+console.log('1. Acesse: https://vercel.com/dashboard')
+console.log('2. Selecione o projeto: didactica-typescript-dashboard')
+console.log('3. Vá em Settings > Environment Variables')
+console.log('4. Adicione cada variável acima')
+console.log('5. Faça um novo deploy')
+console.log('\n✅ Após configurar, o login funcionará no ambiente de produção!')

@@ -55,6 +55,16 @@ export default function FerramentasPlanejamento() {
             <h3>Checklist de Variáveis para Briefing</h3>
             <p>Lista estruturada de verificação com todas as variáveis essenciais que devem ser consideradas e documentadas durante a fase de briefing do projeto educacional.</p>
           </div>
+
+          <div className="tool-card">
+            <a href="/transcricao" className="block">
+              <div className="tool-icon">
+                <i className="fas fa-microphone-lines"></i>
+              </div>
+              <h3>Transcrição</h3>
+              <p>Ferramenta que converte automaticamente áudios e vídeos em texto, facilitando o acesso, análise e documentação do conteúdo falado. Ideal para criar registros de reuniões, legendas, materiais de estudo e acessibilidade em projetos educacionais.</p>
+            </a>
+          </div>
         </div>
         
         <div className="help-section">

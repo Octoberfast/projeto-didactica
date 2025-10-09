@@ -8,6 +8,7 @@ import FerramentasPlanejamento from './pages/FerramentasPlanejamento'
 import FerramentasRevisao from './pages/FerramentasRevisao'
 import GuiaManual from './pages/GuiaManual'
 import ProtectedRoute from './components/ProtectedRoute'
+import Transcricao from './pages/Transcricao'
 
 function App() {
   return (
@@ -53,6 +54,14 @@ function App() {
         element={
           <ProtectedRoute>
             <GuiaManual />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/transcricao" 
+        element={
+          <ProtectedRoute>
+            <Transcricao />
           </ProtectedRoute>
         } 
       />

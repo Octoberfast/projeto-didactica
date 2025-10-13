@@ -43,6 +43,126 @@ export default function Dashboard() {
     checkAuth()
   }, [])
 
+  // Função reutilizável de sincronização: marca 'concluido' em project_requests com base em transcriptions_meta
+  const syncConclusions = async () => {
+    if (!user?.id || !user?.email) return
+    try {
+      const { data: concluidas, error } = await supabase
+        .from('transcriptions_meta')
+        .select('empresa, projeto')
+        .eq('user_id', user.id)
+        .eq('status', 'concluido')
+
+      if (error) throw error
+
+      if (concluidas && concluidas.length > 0) {
+        const updates = concluidas.map(async (row: any) => {
+          const { error: updErr } = await supabase
+            .from('project_requests')
+            .update({ status: 'concluido' })
+            .eq('company_name', row.empresa)
+            .eq('project_name', row.projeto)
+            .eq('user_email', user.email)
+            .eq('status', 'em_andamento')
+
+          if (updErr) {
+            console.error('Falha ao atualizar status em project_requests (sync):', updErr)
+          }
+        })
+
+        await Promise.all(updates)
+        await fetchProjects(user.email)
+      }
+    } catch (e) {
+      console.error('Erro na sincronização de status:', e)
+    }
+  }
+
+  // Assinar atualizações de status na tabela transcriptions_meta
+  useEffect(() => {
+    if (!user?.id || !user?.email) return
+
+    const channel = supabase
+      .channel('transcriptions-meta-status')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'transcriptions_meta',
+        filter: `user_id=eq.${user.id}`,
+      }, async (payload) => {
+        const newRow = payload.new as any
+        // Atualizar project_requests somente quando transcriptions_meta.status === 'concluido'
+        if (newRow?.status === 'concluido') {
+          try {
+            const { error: updErr } = await supabase
+              .from('project_requests')
+              .update({ status: 'concluido' })
+              .eq('company_name', newRow.empresa)
+              .eq('project_name', newRow.projeto)
+              .eq('user_email', user.email)
+              .eq('status', 'em_andamento')
+
+            if (updErr) {
+              console.error('Falha ao atualizar status em project_requests:', updErr)
+              return
+            }
+
+            await fetchProjects(user.email)
+          } catch (e) {
+            console.error('Erro ao processar atualização de transcrição:', e)
+          }
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, user?.email])
+
+  // Sincronização inicial (dentro do componente): refletir transcrições já concluídas
+  useEffect(() => {
+    if (!user?.id || !user?.email) return
+    syncConclusions()
+  }, [user?.id, user?.email])
+
+  // Fallback de sincronização: tenta periodicamente por até 2 minutos
+  useEffect(() => {
+    if (!user?.id || !user?.email) return
+
+    let attempts = 0
+    const maxAttempts = 4
+    const intervalMs = 30000
+
+    const intervalId = setInterval(async () => {
+      attempts += 1
+      await syncConclusions()
+
+      try {
+        const { count, error } = await supabase
+          .from('project_requests')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_email', user.email!)
+          .eq('status', 'em_andamento')
+
+        if (error) {
+          console.error('Erro ao contar projetos em andamento:', error)
+        }
+
+        if ((count ?? 0) === 0 || attempts >= maxAttempts) {
+          clearInterval(intervalId)
+        }
+      } catch (err) {
+        console.error('Erro no fallback de sincronização:', err)
+        if (attempts >= maxAttempts) {
+          clearInterval(intervalId)
+        }
+      }
+    }, intervalMs)
+
+    return () => clearInterval(intervalId)
+  }, [user?.id, user?.email])
+
   const fetchProjects = async (userEmail: string) => {
     try {
       setLoading(true)
@@ -336,3 +456,5 @@ export default function Dashboard() {
     </div>
   )
 }
+
+

@@ -93,6 +93,59 @@ Após o deploy:
 2. Teste o login/cadastro
 3. Verifique se não há erros no console do navegador
 
+## Backup e Rollback
+
+Para fazer ajustes com segurança e garantir que você possa voltar sem perder funcionalidades, siga este plano:
+
+### Snapshot de Código (Git)
+
+- Crie uma **tag** antes dos ajustes:
+  - `git tag -a backup-pre-ajustes-<data> -m "Backup antes dos ajustes"`
+  - `git push origin --tags`
+- Faça os ajustes em uma **branch** dedicada para gerar deploy preview automático no Netlify:
+  - `git checkout -b ajustes/<feature>`
+  - `git push -u origin ajustes/<feature>`
+- Rollback de código:
+  - Para voltar ao estado anterior: `git checkout backup-pre-ajustes-<data>` e criar uma hotfix branch ou fazer um deploy daquele commit.
+
+### Rollback de Deploy (Netlify)
+
+- No dashboard, acesse o site > **Deploys**.
+- Selecione um deploy anterior e clique em **Promote to production** (rollback instantâneo).
+- Alternativamente, faça um push de um commit/tag anterior e aguarde o deploy automático.
+
+### Snapshot de Ambiente
+
+- Registre as variáveis de ambiente em local seguro (não versionar secrets):
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+- Você pode listar variáveis locais com o script: `node scripts/setup-netlify-env.js` (não subir o output para o repositório).
+
+### Backup do Banco (Supabase)
+
+- Opções:
+  - **Dump via CLI** (se projeto estiver linkado): `supabase db dump`
+  - **pg_dump**: `pg_dump <connection_string> -Fc -f backup_$(date +%F).dump`
+  - **Dashboard**: use backups/point-in-time recovery conforme seu plano.
+- Armazene dumps em local seguro (fora do repositório).
+
+### Backup de Storage (Supabase)
+
+- Liste os buckets e exporte objetos críticos (downloads ou via scripts/API).
+- Para rollback, reimporte os arquivos para os buckets correspondentes.
+
+### Boas Práticas de Migração
+
+- Use migrações **idempotentes** e **transacionais**.
+- Planeje migrações **reversíveis** quando possível (ex.: constraints e valores permitidos).
+- Faça rollout em **staging** (branch de preview) antes de produção.
+
+### Validação Pós-Rollback
+
+- Teste o login e rotas protegidas.
+- Verifique o Dashboard, incluindo Realtime e fallback de sincronização.
+- Observe o console do navegador e logs do Netlify.
+
 ## Troubleshooting
 
 ### Erro de Secrets Scanning

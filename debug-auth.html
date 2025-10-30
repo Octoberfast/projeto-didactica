@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Supabase Auth</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Debug Supabase Auth - Netlify</h1>
+    
+    <div>
+        <h3>Informações do Ambiente:</h3>
+        <div id="env-info"></div>
+    </div>
+
+    <div>
+        <h3>Testes:</h3>
+        <button onclick="testBasicConnection()">Testar Conexão Básica</button>
+        <button onclick="testAuth()">Testar Auth</button>
+        <button onclick="testDatabase()">Testar Database</button>
+        <button onclick="testWithDifferentKey()">Testar com Chave Diferente</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // Configurações do Supabase
+        const SUPABASE_URL = 'https://osaiqomiywdtngtddpmg.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zYWlxb21peXdkdG5ndGRkcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNDU3MTAsImV4cCI6MjA3MjkyMTcxMH0.qDPrlB1K5jcFVt1ThVNqcdX07canrgros1eH3suuCUI'
+
+        // Inicializar Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+        function addResult(title, success, data) {
+            const resultsDiv = document.getElementById('results')
+            const resultDiv = document.createElement('div')
+            resultDiv.className = `result ${success ? 'success' : 'error'}`
+            resultDiv.innerHTML = `
+                <h4>${title}</h4>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `
+            resultsDiv.appendChild(resultDiv)
+        }
+
+        function showEnvInfo() {
+            const info = {
+                hostname: window.location.hostname,
+                origin: window.location.origin,
+                protocol: window.location.protocol,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                supabaseUrl: SUPABASE_URL,
+                supabaseKeyLength: SUPABASE_ANON_KEY.length,
+                supabaseKeyPrefix: SUPABASE_ANON_KEY.substring(0, 20) + '...'
+            }
+            document.getElementById('env-info').innerHTML = `<pre>${JSON.stringify(info, null, 2)}</pre>`
+        }
+
+        async function testBasicConnection() {
+            try {
+                const response = await fetch(SUPABASE_URL + '/rest/v1/', {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                    }
+                })
+                
+                const data = await response.text()
+                addResult('Conexão Básica', response.ok, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    data: data
+                })
+            } catch (error) {
+                addResult('Conexão Básica', false, { error: error.message })
+            }
+        }
+
+        async function testAuth() {
+            try {
+                const { data, error } = await supabase.auth.getSession()
+                addResult('Teste Auth', !error, { data, error })
+            } catch (error) {
+                addResult('Teste Auth', false, { error: error.message })
+            }
+        }
+
+        async function testDatabase() {
+            try {
+                const { data, error } = await supabase
+                    .from('user')
+                    .select('count')
+                    .limit(1)
+                
+                addResult('Teste Database', !error, { data, error })
+            } catch (error) {
+                addResult('Teste Database', false, { error: error.message })
+            }
+        }
+
+        async function testWithDifferentKey() {
+            try {
+                // Teste com uma chave inválida para comparar
+                const testClient = window.supabase.createClient(SUPABASE_URL, 'invalid-key')
+                const { data, error } = await testClient
+                    .from('user')
+                    .select('count')
+                    .limit(1)
+                
+                addResult('Teste com Chave Inválida', !error, { data, error })
+            } catch (error) {
+                addResult('Teste com Chave Inválida', false, { error: error.message })
+            }
+        }
+
+        // Mostrar informações do ambiente ao carregar
+        showEnvInfo()
+    </script>
+</body>
+</html>

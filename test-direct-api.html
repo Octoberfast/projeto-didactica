@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Direto API Supabase</title>
+</head>
+<body>
+    <h1>Teste Direto da API Supabase</h1>
+    <button onclick="testDirectAPI()">Testar API Diretamente</button>
+    <div id="result"></div>
+
+    <script>
+        async function testDirectAPI() {
+            const url = 'https://osaiqomiywdtngtddpmg.supabase.co/rest/v1/user?select=count&limit=1'
+            const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zYWlxb21peXdkdG5ndGRkcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNDU3MTAsImV4cCI6MjA3MjkyMTcxMH0.qDPrlB1K5jcFVt1ThVNqcdX07canrgros1eH3suuCUI'
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': apiKey,
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    }
+                })
+                
+                const data = await response.text()
+                
+                document.getElementById('result').innerHTML = `
+                    <h3>Resultado:</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Status Text:</strong> ${response.statusText}</p>
+                    <p><strong>Headers:</strong></p>
+                    <pre>${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}</pre>
+                    <p><strong>Data:</strong></p>
+                    <pre>${data}</pre>
+                    <p><strong>Origin:</strong> ${window.location.origin}</p>
+                    <p><strong>User Agent:</strong> ${navigator.userAgent}</p>
+                `
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h3>Erro:</h3>
+                    <pre>${error.message}</pre>
+                    <p><strong>Origin:</strong> ${window.location.origin}</p>
+                `
+            }
+        }
+    </script>
+</body>
+</html>

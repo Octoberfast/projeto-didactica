@@ -128,8 +128,6 @@ export default function Login() {
             Trocar Senha
           </Link>
         </div>
-
-        {/* Debug panel removido */}
       </div>
     </div>
   )

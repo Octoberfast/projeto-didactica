@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Debug Supabase em Produção</h1>
+    <div id="results"></div>
+    
+    <script>
+        const supabaseUrl = 'https://osaiqomiywdtngtddpmg.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zYWlxb21peXdkdG5ndGRkcG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczNDU3MTAsImV4cCI6MjA3MjkyMTcxMH0.qDPrlB1K5jcFVt1ThVNqcdX07canrgros1eH3suuCUI'
+        
+        const { createClient } = supabase
+        const supabaseClient = createClient(supabaseUrl, supabaseKey)
+        
+        const results = document.getElementById('results')
+        
+        async function testConnection() {
+            results.innerHTML += '<h2>Testando Conexão...</h2>'
+            
+            try {
+                // Test basic connection
+                const { data, error } = await supabaseClient.from('project_requests').select('count', { count: 'exact', head: true })
+                
+                if (error) {
+                    results.innerHTML += `<p style="color: red;">Erro de conexão: ${error.message}</p>`
+                } else {
+                    results.innerHTML += '<p style="color: green;">Conexão com Supabase funcionando!</p>'
+                }
+            } catch (err) {
+                results.innerHTML += `<p style="color: red;">Erro inesperado: ${err}</p>`
+            }
+        }
+        
+        async function testAuth() {
+            results.innerHTML += '<h2>Testando Autenticação...</h2>'
+            
+            try {
+                // Test with a dummy login to see the specific error
+                const { error } = await supabaseClient.auth.signInWithPassword({
+                    email: 'test@test.com',
+                    password: 'testpassword'
+                })
+                
+                if (error) {
+                    results.innerHTML += `<p style="color: orange;">Erro de autenticação (esperado): ${error.message}</p>`
+                } else {
+                    results.innerHTML += '<p style="color: red;">Login de teste funcionou (não deveria!)</p>'
+                }
+            } catch (err) {
+                results.innerHTML += `<p style="color: red;">Erro inesperado na autenticação: ${err}</p>`
+            }
+        }
+        
+        // Run tests
+        testConnection()
+        testAuth()
+    </script>
+</body>
+</html>

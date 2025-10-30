@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CheckCircle, Target, Users, Map, Palette, ArrowLeft, Hash, AlertCircle, Upload, X, MessageCircle, Star, FileText, Mic } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { CheckCircle, Target, Users, Map, Palette, ArrowLeft, Hash, AlertCircle, Upload, X, MessageCircle, Star, FileText, Mic, Copy } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
@@ -244,6 +244,53 @@ export default function GuiaManual() {
     }
     getUser()
   }, [])
+
+  // Função para carregar dados do projeto original
+  const loadOriginalProjectData = async (projectId: string) => {
+    setIsLoadingOriginalData(true)
+    try {
+      const { data: project, error } = await supabase
+        .from('project_requests')
+        .select('*')
+        .eq('id', projectId)
+        .single()
+
+      if (error) {
+        throw new Error(`Erro ao carregar projeto original: ${error.message}`)
+      }
+
+      if (project && project.form_data) {
+        // Pré-preencher formulário com dados do projeto original (exceto anexos)
+        const originalData = project.form_data
+        setFormData(prev => ({
+          ...prev,
+          nomeEmpresa: originalData.nomeEmpresa || '',
+          nomeProjeto: originalData.nomeProjeto || '',
+          responsavelNome: originalData.responsavelNome || '',
+          responsavelEmail: originalData.responsavelEmail || '',
+          areaDepartamento: originalData.areaDepartamento || '',
+          prazoEntrega: originalData.prazoEntrega || '',
+          objetivo: originalData.objetivo || '',
+          tomVoz: originalData.tomVoz || '',
+          cargo: originalData.cargo || '',
+          escolaridade: originalData.escolaridade || '',
+          dominioTecnico: originalData.dominioTecnico || '',
+          quantidadeSecoes: originalData.quantidadeSecoes || '',
+          pontosCriticos: originalData.pontosCriticos || '',
+          estiloVisual: originalData.estiloVisual || [],
+          // anexos permanecem vazios conforme solicitado
+          anexos: []
+        }))
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do projeto original:', error)
+      setSubmitError(error instanceof Error ? error.message : 'Erro ao carregar dados do projeto original')
+      setShowErrorModal(true)
+    } finally {
+      setIsLoadingOriginalData(false)
+    }
+  }
+
   const [formData, setFormData] = useState({
     // 1. Informações do Projeto
     nomeEmpresa: '',
@@ -278,10 +325,27 @@ export default function GuiaManual() {
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitProgress, setSubmitProgress] = useState('')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const navigate = useNavigate()
+  
+  // Estados para modo de reutilização
+  const [searchParams] = useSearchParams()
+  const [isReuseMode, setIsReuseMode] = useState(false)
+  const [originalProjectId, setOriginalProjectId] = useState<string | null>(null)
+  const [isLoadingOriginalData, setIsLoadingOriginalData] = useState(false)
+
+  // Detectar modo de reutilização
+  useEffect(() => {
+    const reuseProjectId = searchParams.get('reuse')
+    if (reuseProjectId) {
+      setIsReuseMode(true)
+      setOriginalProjectId(reuseProjectId)
+      loadOriginalProjectData(reuseProjectId)
+    }
+  }, [searchParams])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -345,6 +409,39 @@ export default function GuiaManual() {
     return true;
   };
 
+  const validateFiles = () => {
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'
+    ];
+
+    for (const file of formData.anexos) {
+      if (file.size > maxFileSize) {
+        throw new Error(`O arquivo "${file.name}" excede o tamanho máximo de 10MB.`);
+      }
+      
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error(`O arquivo "${file.name}" não é um tipo permitido. Use apenas PDF, DOC, DOCX ou TXT.`);
+      }
+    }
+  };
+
+  // Função para sanitizar nome do arquivo
+  const sanitizeFileName = (fileName: string): string => {
+    // Remove acentos e caracteres especiais
+    const sanitized = fileName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/[^a-zA-Z0-9._-]/g, '_') // Substitui caracteres especiais por underscore
+      .replace(/_{2,}/g, '_') // Remove underscores duplos
+      .replace(/^_|_$/g, ''); // Remove underscores no início e fim
+    
+    return sanitized;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -354,47 +451,115 @@ export default function GuiaManual() {
       return;
     }
     
+    if (!user?.email) {
+      setSubmitError('Usuário não autenticado. Faça login novamente.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    // Validar arquivos antes de enviar
+    try {
+      validateFiles();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Erro na validação dos arquivos.');
+      setShowErrorModal(true);
+      return;
+    }
+    
     setIsSubmitting(true)
     setSubmitError(null)
+    setSubmitProgress('Criando projeto...')
 
     try {
-      const submitData = new FormData();
+      // 1. Inserir projeto no Supabase
+      const projectData = {
+        company_name: formData.nomeEmpresa,
+        project_name: formData.nomeProjeto,
+        responsible: formData.responsavelNome,
+        department: formData.areaDepartamento,
+        request_deadline: formData.prazoEntrega,
+        delivery_deadline: formData.prazoEntrega, // Usando mesmo prazo por enquanto
+        user_email: user.email,
+        status: 'aguardando_ingestao',
+        form_data: formData,
+        ...(originalProjectId && { origin_id: originalProjectId })
+      };
+
+      const { data: projectResult, error: projectError } = await supabase
+        .from('project_requests')
+        .insert(projectData)
+        .select('id')
+        .single();
+
+      if (projectError) {
+        throw new Error(`Erro ao criar projeto: ${projectError.message}`);
+      }
+
+      const projectId = projectResult.id;
+
+      // 2. Upload de arquivos com nomenclatura única
+      if (formData.anexos.length > 0) {
+        setSubmitProgress(`Enviando arquivos (0/${formData.anexos.length})...`);
+      }
       
-      // Adicionar todos os campos do formulário
-      Object.entries(formData).forEach(([key, value]) => {
-        if (key === 'anexos') {
-          // Adicionar arquivos
-          (value as File[]).forEach((file, index) => {
-            submitData.append(`anexo_${index}`, file);
+      const uploadedFiles = [];
+      for (let i = 0; i < formData.anexos.length; i++) {
+        const file = formData.anexos[i];
+        setSubmitProgress(`Enviando arquivos (${i + 1}/${formData.anexos.length}): ${file.name}...`);
+        
+        // Substitui espaços e caracteres problemáticos
+        const sanitizedName = file.name.replace(/[^\w.-]/g, '_');
+        const storagePath = `${projectId}/${sanitizedName}`;
+
+        // Upload para Supabase Storage com upsert: true
+        const { error: uploadError } = await supabase.storage
+          .from('project_files')
+          .upload(storagePath, file, {
+            upsert: true // impede renomeação automática
           });
-        } else if (key === 'estiloVisual') {
-          // Adicionar array como string
-          submitData.append(key, JSON.stringify(value));
-        } else {
-          submitData.append(key, value as string);
+
+        if (uploadError) {
+          throw new Error(`Erro no upload do arquivo ${file.name}: ${uploadError.message}`);
         }
-      });
-      
-      // Adicionar email do usuário logado como solicitante
-      if (user?.email) {
-        submitData.append('solicitanteEmail', user.email);
+
+        // 3. Mapear metadados do arquivo
+        const fileMetadata = {
+          project_id: projectId,
+          file_name: sanitizedName,
+          file_path: storagePath,
+          original_name: file.name,
+          storage_path: storagePath,
+          mime_type: file.type,
+          file_size: file.size
+        };
+
+        const { error: metadataError } = await supabase
+          .from('project_files_map')
+          .insert(fileMetadata);
+
+        if (metadataError) {
+          throw new Error(`Erro ao salvar metadados do arquivo ${file.name}: ${metadataError.message}`);
+        }
+
+        uploadedFiles.push({
+          name: file.name,
+          uniqueName: sanitizedName,
+          path: storagePath
+        });
       }
+
+      setSubmitProgress('Finalizando...');
       
-      const response = await fetch('https://webhook.reduct.agency/webhook/guia-manual', {
-        method: 'POST',
-        body: submitData
-      });
-      
-      if (response.ok) {
-        setShowSuccessModal(true);
-      } else {
-        throw new Error('Erro no envio');
-      }
+      // 4. Sucesso - exibir modal de confirmação
+      setShowSuccessModal(true);
+
     } catch (error) {
-      setSubmitError('Erro ao enviar o briefing. Tente novamente.');
+      console.error('Erro no envio:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Erro ao enviar o briefing. Tente novamente.');
       setShowErrorModal(true);
     } finally {
       setIsSubmitting(false)
+      setSubmitProgress('')
     }
   }
 
@@ -433,6 +598,32 @@ export default function GuiaManual() {
             Voltar à seleção
           </button>
         </div>
+
+        {/* Banner de Reutilização */}
+        {isReuseMode && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-8">
+            <div className="flex items-start">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                <Copy className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                  Modo Reutilização Ativado
+                </h3>
+                <p className="text-blue-700 text-sm">
+                  Os dados do projeto original foram carregados automaticamente. Você pode editá-los conforme necessário antes de enviar. 
+                  Os arquivos anexados do projeto original não foram incluídos - você pode anexar novos arquivos se desejar.
+                </p>
+                {isLoadingOriginalData && (
+                  <div className="mt-3 flex items-center text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    <span className="text-sm">Carregando dados do projeto original...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -819,10 +1010,20 @@ export default function GuiaManual() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="bg-orange-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-orange-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[200px]"
             >
-              {isSubmitting ? 'Enviando...' : 'Enviar Briefing'}
+              {isSubmitting ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  {submitProgress || 'Enviando...'}
+                </div>
+              ) : (
+                'Enviar Briefing'
+              )}
             </button>
+            {isSubmitting && submitProgress && (
+              <p className="text-sm text-gray-600 mt-2">{submitProgress}</p>
+            )}
           </div>
 
           {/* Error Message */}
@@ -844,13 +1045,18 @@ export default function GuiaManual() {
                 <CheckCircle className="w-16 h-16 mx-auto mb-4" style={{color: '#5f4a8c'}} />
                 <h3 className="text-xl font-semibold mb-2">Briefing Enviado!</h3>
                 <p className="text-gray-600 mb-4">
-                  Seu briefing foi enviado com sucesso.
+                  Seu projeto "{formData.nomeProjeto}" foi criado com sucesso e está aguardando processamento.
                 </p>
+                {formData.anexos.length > 0 && (
+                  <p className="text-sm text-gray-500 mb-4">
+                    {formData.anexos.length} arquivo{formData.anexos.length > 1 ? 's' : ''} enviado{formData.anexos.length > 1 ? 's' : ''} com sucesso.
+                  </p>
+                )}
                 <button
                   onClick={handleSuccessClose}
                   className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors"
                 >
-                  Fechar
+                  Voltar ao Início
                 </button>
               </div>
             </div>

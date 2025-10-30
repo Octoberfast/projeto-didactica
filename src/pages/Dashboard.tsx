@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { Filter, ArrowUpDown, ArrowUp, ArrowDown, Copy, CheckCircle, Clock, FileText } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
 interface ProjectRequest {
@@ -15,6 +16,14 @@ interface ProjectRequest {
   status: 'em_andamento' | 'concluido'
   user_email: string
   created_at: string
+  origin_id?: string
+  form_data?: any
+}
+
+interface DashboardFilters {
+  status: 'rascunho' | 'em_progresso' | 'concluido' | 'todos'
+  sortBy: 'created_at' | 'title'
+  sortOrder: 'asc' | 'desc'
 }
 
 export default function Dashboard() {
@@ -24,10 +33,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Estados dos filtros
-  const [companyFilter, setCompanyFilter] = useState<string>('todos')
-  const [projectFilter, setProjectFilter] = useState<string>('todos')
-  const [statusFilter, setStatusFilter] = useState<string>('todos')
+  // Novos estados para filtros simplificados
+  const [filters, setFilters] = useState<DashboardFilters>({
+    status: 'todos',
+    sortBy: 'created_at',
+    sortOrder: 'desc'
+  })
 
   useEffect(() => {
     // Protect this route - require authentication
@@ -201,58 +212,71 @@ export default function Dashboard() {
     }
   }
 
-  // Função para aplicar filtros
-  const applyFilters = () => {
+  // Função para reutilizar conteúdo
+  const handleReuseContent = (project: ProjectRequest) => {
+    // Redirecionar para a página de Guia & Manual com parâmetro de reutilização
+    window.location.href = `/guia-manual?reuse=${project.id}`
+  }
+
+  // Função para aplicar filtros e ordenação
+  const applyFiltersAndSort = () => {
     let filtered = projects
 
-    if (companyFilter !== 'todos') {
-      filtered = filtered.filter(project => project.company_name === companyFilter)
+    // Aplicar filtro por status
+    if (filters.status !== 'todos') {
+      // Mapear os status para compatibilidade
+      const statusMap = {
+        'rascunho': 'em_andamento', // Temporário até implementar rascunho
+        'em_progresso': 'em_andamento',
+        'concluido': 'concluido'
+      }
+      const mappedStatus = statusMap[filters.status]
+      filtered = filtered.filter(project => project.status === mappedStatus)
     }
 
-    if (projectFilter !== 'todos') {
-      filtered = filtered.filter(project => project.project_name === projectFilter)
-    }
-
-    if (statusFilter !== 'todos') {
-      filtered = filtered.filter(project => project.status === statusFilter)
-    }
+    // Aplicar ordenação
+    filtered.sort((a, b) => {
+      let comparison = 0
+      
+      if (filters.sortBy === 'created_at') {
+        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      } else if (filters.sortBy === 'title') {
+        comparison = a.project_name.localeCompare(b.project_name)
+      }
+      
+      return filters.sortOrder === 'desc' ? -comparison : comparison
+    })
 
     setFilteredProjects(filtered)
   }
 
   // Aplicar filtros quando os valores mudarem
   useEffect(() => {
-    applyFilters()
-  }, [companyFilter, projectFilter, statusFilter, projects])
+    applyFiltersAndSort()
+  }, [filters, projects])
 
-  // Obter valores únicos para os dropdowns
-  const getUniqueCompanies = () => {
-    const companies = [...new Set(projects.map(p => p.company_name))]
-    return companies.sort()
+  const handleFilterChange = (newFilters: Partial<DashboardFilters>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }))
   }
 
-  const getUniqueProjects = () => {
-    const projectNames = [...new Set(projects.map(p => p.project_name))]
-    return projectNames.sort()
+  const handleSort = (field: 'created_at' | 'title') => {
+    if (filters.sortBy === field) {
+      // Se já está ordenando por este campo, inverte a ordem
+      handleFilterChange({ sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc' })
+    } else {
+      // Se é um novo campo, define como descendente por padrão
+      handleFilterChange({ sortBy: field, sortOrder: 'desc' })
+    }
   }
 
-  const getUniqueStatuses = () => {
-    const statuses = [...new Set(projects.map(p => p.status))]
-    return statuses.sort()
+  const getSortIcon = (field: 'created_at' | 'title') => {
+    if (filters.sortBy !== field) {
+      return <ArrowUpDown className="w-4 h-4 text-gray-400" />
+    }
+    return filters.sortOrder === 'asc' 
+      ? <ArrowUp className="w-4 h-4 text-blue-600" />
+      : <ArrowDown className="w-4 h-4 text-blue-600" />
   }
-
-  const getStatusLabel = (status: string) => {
-    if (status === 'em_andamento') return 'Em Andamento'
-    if (status === 'concluido') return 'Concluído'
-    return status
-  }
-
-  const formatDate = (dateString: string) => {
-    // Para campos DATE do PostgreSQL, evitar conversão de timezone
-    // que pode causar diferença de 1 dia
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-  };
 
   const formatDateTime = (dateTimeString: string) => {
     const date = new Date(dateTimeString);
@@ -264,35 +288,13 @@ export default function Dashboard() {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
-  const formatTime = (dateTimeString: string) => {
-    const date = new Date(dateTimeString);
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  };
-
-  const getStatusBadge = (status: string) => {
-    const baseClasses = 'px-3 py-1 rounded-full text-white text-sm font-medium'
-    
+  const getStatusBadgeClass = (status: string) => {
     if (status === 'em_andamento') {
-      return (
-        <span className={`${baseClasses} bg-custom-purple`}>
-          Em Andamento
-        </span>
-      )
+      return 'bg-yellow-100 text-yellow-800'
     } else if (status === 'concluido') {
-      return (
-        <span className={`${baseClasses} bg-blue-500`}>
-          Concluído
-        </span>
-      )
+      return 'bg-green-100 text-green-800'
     }
-    
-    return (
-      <span className={`${baseClasses} bg-gray-500`}>
-        {status}
-      </span>
-    )
+    return 'bg-gray-100 text-gray-800'
   }
 
   if (loading) {
@@ -300,7 +302,7 @@ export default function Dashboard() {
       <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-50 to-pink-100">
         <Header />
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-custom-purple"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
         </div>
         <Footer />
       </div>
@@ -313,8 +315,14 @@ export default function Dashboard() {
       
       <main className="container mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Hero Section - Seguindo padrão do GuiaManual */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-custom-purple mb-2">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Filter className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-4">
               Minhas Solicitações de Projeto
             </h1>
             <p className="text-gray-600">
@@ -322,67 +330,118 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Seção de Filtros */}
-          <div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Filtros</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Filtro por Empresa */}
-              <div>
-                <label htmlFor="company-filter" className="block text-xs font-medium text-gray-700 mb-2">
-                  Empresa
-                </label>
-                <select
-                  id="company-filter"
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="todos">Todos</option>
-                  {getUniqueCompanies().map((company) => (
-                    <option key={company} value={company}>
-                      {company}
-                    </option>
-                  ))}
-                </select>
+          {/* Seção de Filtros - Redesenhada */}
+          <div className="bg-white rounded-2xl shadow-lg p-4 md:p-8 hover:shadow-xl transition-shadow duration-300 mb-8">
+            <div className="flex items-center mb-4 md:mb-6">
+              <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3 md:mr-4">
+                <Filter className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+              </div>
+              <h2 className="text-lg md:text-2xl font-semibold text-slate-900">Filtros e Ordenação</h2>
+            </div>
+            
+            {/* Layout Mobile - Compacto */}
+            <div className="md:hidden space-y-4">
+              {/* Linha 1: Status e Ordenação */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="status-filter-mobile" className="block text-xs font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    id="status-filter-mobile"
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange({ status: e.target.value as DashboardFilters['status'] })}
+                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="rascunho">Rascunho</option>
+                    <option value="em_progresso">Em Progresso</option>
+                    <option value="concluido">Concluído</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="sort-by-mobile" className="block text-xs font-medium text-gray-700 mb-1">
+                    Ordenar por
+                  </label>
+                  <select
+                    id="sort-by-mobile"
+                    value={filters.sortBy}
+                    onChange={(e) => handleFilterChange({ sortBy: e.target.value as DashboardFilters['sortBy'] })}
+                    className="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="created_at">Data</option>
+                    <option value="title">Título</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Filtro por Projeto */}
+              {/* Linha 2: Ordem */}
               <div>
-                <label htmlFor="project-filter" className="block text-xs font-medium text-gray-700 mb-2">
-                  Projeto
+                <label htmlFor="sort-order-mobile" className="block text-xs font-medium text-gray-700 mb-1">
+                  Ordem
                 </label>
                 <select
-                  id="project-filter"
-                  value={projectFilter}
-                  onChange={(e) => setProjectFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  id="sort-order-mobile"
+                  value={filters.sortOrder}
+                  onChange={(e) => handleFilterChange({ sortOrder: e.target.value as DashboardFilters['sortOrder'] })}
+                  className="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="todos">Todos</option>
-                  {getUniqueProjects().map((project) => (
-                    <option key={project} value={project}>
-                      {project}
-                    </option>
-                  ))}
+                  <option value="desc">Mais recente primeiro</option>
+                  <option value="asc">Mais antigo primeiro</option>
                 </select>
               </div>
+            </div>
 
+            {/* Layout Desktop - Original */}
+            <div className="hidden md:grid grid-cols-3 gap-6">
               {/* Filtro por Status */}
               <div>
-                <label htmlFor="status-filter" className="block text-xs font-medium text-gray-700 mb-2">
+                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-2">
                   Status
                 </label>
                 <select
                   id="status-filter"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange({ status: e.target.value as DashboardFilters['status'] })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="todos">Todos</option>
-                  {getUniqueStatuses().map((status) => (
-                    <option key={status} value={status}>
-                      {getStatusLabel(status)}
-                    </option>
-                  ))}
+                  <option value="rascunho">Rascunho</option>
+                  <option value="em_progresso">Em Progresso</option>
+                  <option value="concluido">Concluído</option>
+                </select>
+              </div>
+
+              {/* Ordenação */}
+              <div>
+                <label htmlFor="sort-by" className="block text-sm font-medium text-gray-700 mb-2">
+                  Ordenar por
+                </label>
+                <select
+                  id="sort-by"
+                  value={filters.sortBy}
+                  onChange={(e) => handleFilterChange({ sortBy: e.target.value as DashboardFilters['sortBy'] })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="created_at">Data de Criação</option>
+                  <option value="title">Título</option>
+                </select>
+              </div>
+
+              {/* Ordem */}
+              <div>
+                <label htmlFor="sort-order" className="block text-sm font-medium text-gray-700 mb-2">
+                  Ordem
+                </label>
+                <select
+                  id="sort-order"
+                  value={filters.sortOrder}
+                  onChange={(e) => handleFilterChange({ sortOrder: e.target.value as DashboardFilters['sortOrder'] })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="desc">Mais recente primeiro</option>
+                  <option value="asc">Mais antigo primeiro</option>
                 </select>
               </div>
             </div>
@@ -408,42 +467,160 @@ export default function Dashboard() {
                 Você ainda não possui projetos solicitados.
               </p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full table-auto">
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Empresa</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Projeto</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Responsável</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Departamento</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Data de Solicitação</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Horário de Solicitação</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Prazo Entrega</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProjects.map((project, index) => (
-                    <tr 
-                      key={project.id} 
-                      className={`border-b hover:bg-gray-50 transition-colors ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-gray-25'
-                      }`}
-                    >
-                      <td className="px-4 py-4 text-sm text-gray-900 font-medium">{project.company_name}</td>
-                      <td className="px-4 py-4 text-sm text-gray-900 font-medium">{project.project_name}</td>
-                      <td className="px-4 py-4 text-sm text-gray-900">{project.responsible}</td>
-                      <td className="px-4 py-4 text-sm text-gray-900">{project.department}</td>
-                      <td className="px-4 py-4 text-sm text-gray-900">{formatDate(project.request_deadline)}</td>
-                      <td className="px-4 py-4 text-sm text-gray-900">{formatTime(project.created_at)}</td>
-                      <td className="px-4 py-4 text-sm text-gray-900">{formatDate(project.delivery_deadline)}</td>
-                      <td className="px-4 py-4">{getStatusBadge(project.status)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          ) : filteredProjects.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 mb-4">
+                <Filter className="mx-auto h-16 w-16" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Nenhum conteúdo encontrado com este filtro
+              </h3>
+              <p className="text-gray-500">
+                Tente ajustar os filtros para ver mais resultados.
+              </p>
             </div>
+          ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full table-auto">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                        <button
+                          onClick={() => handleSort('title')}
+                          className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                        >
+                          <span>Projeto</span>
+                          {getSortIcon('title')}
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">
+                        <button
+                          onClick={() => handleSort('created_at')}
+                          className="flex items-center space-x-1 hover:text-blue-600 transition-colors"
+                        >
+                          <span>Data de Criação</span>
+                          {getSortIcon('created_at')}
+                        </button>
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Departamento</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Status</th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-gray-700">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProjects.map((project) => (
+                      <tr key={project.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <FileText className="w-4 h-4 text-gray-400 mr-2" />
+                            <div>
+                              <div className="font-medium text-gray-900">{project.project_name}</div>
+                              <div className="text-sm text-gray-500">{project.company_name}</div>
+                              {project.origin_id && (
+                                <div className="text-xs text-blue-600 flex items-center mt-1">
+                                  <Copy className="w-3 h-3 mr-1" />
+                                  Reutilizado
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {formatDateTime(project.created_at)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {project.department}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(project.status)}`}>
+                            {project.status === 'concluido' ? (
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                            ) : (
+                              <Clock className="w-3 h-3 mr-1" />
+                            )}
+                            {project.status === 'em_andamento' ? 'Em progresso' : 'Concluído'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {project.status === 'concluido' && project.department !== 'Transcrição' && (
+                            <button
+                              onClick={() => handleReuseContent(project)}
+                              disabled={loading}
+                              className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Reutilizar este conteúdo"
+                            >
+                              <Copy className="w-4 h-4 mr-1" />
+                              Reutilizar
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-4">
+                {filteredProjects.map((project) => (
+                  <div key={project.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    {/* Header do Card */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center flex-1">
+                        <FileText className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-medium text-gray-900 truncate">{project.project_name}</h3>
+                          <p className="text-sm text-gray-500 truncate">{project.company_name}</p>
+                          {project.origin_id && (
+                            <div className="text-xs text-blue-600 flex items-center mt-1">
+                              <Copy className="w-3 h-3 mr-1" />
+                              Reutilizado
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ml-2 ${getStatusBadgeClass(project.status)}`}>
+                        {project.status === 'concluido' ? (
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                        ) : (
+                          <Clock className="w-3 h-3 mr-1" />
+                        )}
+                        {project.status === 'em_andamento' ? 'Em progresso' : 'Concluído'}
+                      </span>
+                    </div>
+
+                    {/* Informações do Card */}
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <div className="flex items-center">
+                        <span className="font-medium w-20">Depto:</span>
+                        <span>{project.department}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="font-medium w-20">Criado:</span>
+                        <span>{formatDateTime(project.created_at)}</span>
+                      </div>
+                    </div>
+
+                    {/* Ações do Card */}
+                    {project.status === 'concluido' && project.department !== 'Transcrição' && (
+                      <div className="mt-4 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={() => handleReuseContent(project)}
+                          disabled={loading}
+                          className="w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Reutilizar este conteúdo"
+                        >
+                          <Copy className="w-4 h-4 mr-2" />
+                          Reutilizar Conteúdo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
 
           <div className="mt-6 text-center text-sm text-gray-500">

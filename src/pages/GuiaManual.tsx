@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CheckCircle, Target, Users, Map, Palette, ArrowLeft, Hash, AlertCircle, Upload, X, MessageCircle, Star, FileText, Mic, Copy, SendHorizontal } from 'lucide-react'
+import { CheckCircle, Target, Users, Map, Palette, ArrowLeft, Hash, AlertCircle, Upload, FileText, Mic, Copy, SendHorizontal } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
@@ -13,6 +13,8 @@ interface FileUploadProps {
 }
 
 function FileUpload({ files, onFilesChange }: FileUploadProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
@@ -25,9 +27,57 @@ function FileUpload({ files, onFilesChange }: FileUploadProps) {
     onFilesChange(updatedFiles);
   };
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const newFiles = Array.from(e.dataTransfer.files);
+      // Filtrar apenas arquivos aceitos
+      const acceptedFiles = newFiles.filter(file => {
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        return ['pdf', 'doc', 'docx', 'txt'].includes(extension || '');
+      });
+      
+      if (acceptedFiles.length > 0) {
+        onFilesChange([...files, ...acceptedFiles]);
+      }
+      
+      e.dataTransfer.clearData();
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+      <div 
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+          isDragging 
+            ? 'border-[#7A4CE0] bg-[rgba(122,76,224,0.05)]' 
+            : 'border-gray-300 hover:border-gray-400'
+        }`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
         <input
           type="file"
           multiple
@@ -284,8 +334,9 @@ export default function GuiaManual() {
           responsavelEmail: originalData.responsavelEmail || '',
           areaDepartamento: originalData.areaDepartamento || '',
           prazoEntrega: originalData.prazoEntrega || '',
+
+
           objetivo: originalData.objetivo || '',
-          tomVoz: originalData.tomVoz || '',
           cargo: originalData.cargo || '',
           publicoCargo: originalData.cargo || '',
           escolaridade: originalData.escolaridade || '',
@@ -318,14 +369,10 @@ export default function GuiaManual() {
     
     // 2. Objetivo do Conteúdo
     objetivo: '', // Inicialmente vazio para não aparecer selecionado
-    objetivoConteudo: '',
 
     // Tipo de Elemento Educacional
     tipoElementoEducacional: '',
     
-    // 3. Tom de Voz
-    tomVoz: '', // Inicialmente vazio para não aparecer selecionado
-
     // Estilo de Linguagem
     estiloLinguagem: '',
     
@@ -389,13 +436,6 @@ export default function GuiaManual() {
     }));
   };
 
-  const handleRadioChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
   const handleFilesChange = (files: File[]) => {
     setFormData(prev => ({
       ...prev,
@@ -441,7 +481,7 @@ export default function GuiaManual() {
   const validateForm = () => {
     const requiredFields = [
       'nomeEmpresa', 'nomeProjeto', 'responsavelNome', 'responsavelEmail',
-      'areaDepartamento', 'objetivoConteudo', 'tomVoz', 'estiloLinguagem', 'tipoElementoEducacional',
+      'areaDepartamento', 'estiloLinguagem', 'tipoElementoEducacional',
       'publicoCargo', 'escolaridade', 'dominioTecnico', 'quantidadeSecoes'
     ];
     
@@ -479,19 +519,6 @@ export default function GuiaManual() {
     }
   };
 
-  // Função para sanitizar nome do arquivo
-  const sanitizeFileName = (fileName: string): string => {
-    // Remove acentos e caracteres especiais
-    const sanitized = fileName
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/[^a-zA-Z0-9._-]/g, '_') // Substitui caracteres especiais por underscore
-      .replace(/_{2,}/g, '_') // Remove underscores duplos
-      .replace(/^_|_$/g, ''); // Remove underscores no início e fim
-    
-    return sanitized;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -527,14 +554,6 @@ export default function GuiaManual() {
         project_name: formData.nomeProjeto,
         responsible: formData.responsavelNome,
         department: formData.areaDepartamento,
-        request_deadline: formData.prazoEntrega,
-        delivery_deadline: formData.prazoEntrega, // Usando mesmo prazo por enquanto
-        objetivo_conteudo: formData.objetivoConteudo,
-        tipo_elemento_educacional: formData.tipoElementoEducacional,
-        estilo_linguagem: formData.estiloLinguagem,
-        publico_cargo: formData.publicoCargo,
-        estilo_visual: formData.estiloVisual,
-        numero_paginas: formData.numeroPaginas,
         user_email: user.email,
         status: 'aguardando_ingestao',
         form_data: formData,
@@ -833,10 +852,10 @@ export default function GuiaManual() {
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, objetivoConteudo: option.value }))}
+                    onClick={() => setFormData(prev => ({ ...prev, objetivo: option.value }))}
                     className={`
                       inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium text-sm transition-all duration-150 ease-in-out
-                      ${formData.objetivoConteudo === option.value
+                      ${formData.objetivo === option.value
                         ? 'bg-[#EDE7FF] text-[#7C54FF] border-[rgba(124,84,255,0.45)] ring-1 ring-[rgba(122,76,224,0.20)] shadow-sm font-semibold'
                         : 'bg-white text-[#4B4B4B] border-[rgba(124,84,255,0.25)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[rgba(124,84,255,0.06)] hover:border-[rgba(124,84,255,0.35)] hover:shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]'
                       }
@@ -849,13 +868,13 @@ export default function GuiaManual() {
             </div>
           </div>
 
-          {/* 3. Tom de Voz */}
+          {/* 3. Estilo de Linguagem */}
           <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-12 mb-8">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
                 <Mic className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-lg font-semibold text-gray-800">Estilo de Linguagem</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Tom de Voz</h2>
             </div>
             <div className="space-y-4">
               <p className="text-sm text-gray-600 tracking-tight mb-7">Escolha apenas uma opção:</p>
@@ -884,7 +903,7 @@ export default function GuiaManual() {
             </div>
           </div>
 
-          {/* 4. Público-Alvo */}
+          {/* 3. Público-Alvo */}
           <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-12 mb-8">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CheckCircle, Target, Users, Map, Palette, ArrowLeft, Hash, AlertCircle, Upload, X, MessageCircle, Star, FileText, Mic, Copy } from 'lucide-react'
+import { CheckCircle, Target, Users, Map, Palette, ArrowLeft, Hash, AlertCircle, Upload, X, MessageCircle, Star, FileText, Mic, Copy, SendHorizontal } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
@@ -71,7 +71,7 @@ export default function GuiaManual() {
       height: 20px;
       width: 20px;
       border-radius: 50%;
-      background: #3b82f6;
+      background: #7A4CE0;
       cursor: pointer;
       border: 2px solid #ffffff;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
@@ -79,16 +79,16 @@ export default function GuiaManual() {
     }
     
     .slider::-webkit-slider-thumb:hover {
-      background: #2563eb;
+      background: #6939d6;
       transform: scale(1.1);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      box-shadow: 0 4px 12px rgba(122, 76, 224, 0.4);
     }
     
     .slider::-moz-range-thumb {
       height: 20px;
       width: 20px;
       border-radius: 50%;
-      background: #3b82f6;
+      background: #7A4CE0;
       cursor: pointer;
       border: 2px solid #ffffff;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
@@ -96,9 +96,9 @@ export default function GuiaManual() {
     }
     
     .slider::-moz-range-thumb:hover {
-      background: #2563eb;
+      background: #6939d6;
       transform: scale(1.1);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+      box-shadow: 0 4px 12px rgba(122, 76, 224, 0.4);
     }
     
     .slider:focus {
@@ -106,7 +106,21 @@ export default function GuiaManual() {
     }
     
     .slider:focus::-webkit-slider-thumb {
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 0 0 3px rgba(122, 76, 224, 0.3);
+    }
+  `;
+
+  const formCardStyles = `
+    .form-card {
+      background-color: #FFFFFF;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+      transition: all 180ms ease;
+      transform: translateY(0);
+      will-change: transform, box-shadow;
+    }
+    .form-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
   `;
 
@@ -273,9 +287,11 @@ export default function GuiaManual() {
           objetivo: originalData.objetivo || '',
           tomVoz: originalData.tomVoz || '',
           cargo: originalData.cargo || '',
+          publicoCargo: originalData.cargo || '',
           escolaridade: originalData.escolaridade || '',
           dominioTecnico: originalData.dominioTecnico || '',
           quantidadeSecoes: originalData.quantidadeSecoes || '',
+          numeroPaginas: originalData.numeroPaginas || '',
           pontosCriticos: originalData.pontosCriticos || '',
           estiloVisual: originalData.estiloVisual || [],
           // anexos permanecem vazios conforme solicitado
@@ -302,17 +318,26 @@ export default function GuiaManual() {
     
     // 2. Objetivo do Conteúdo
     objetivo: '', // Inicialmente vazio para não aparecer selecionado
+    objetivoConteudo: '',
+
+    // Tipo de Elemento Educacional
+    tipoElementoEducacional: '',
     
     // 3. Tom de Voz
     tomVoz: '', // Inicialmente vazio para não aparecer selecionado
+
+    // Estilo de Linguagem
+    estiloLinguagem: '',
     
     // 4. Público-Alvo
     cargo: '',
+    publicoCargo: '',
     escolaridade: '',
     dominioTecnico: '',
     
     // 5. Quantidade de Seções
     quantidadeSecoes: '',
+    numeroPaginas: '',
     
     // 6. Pontos Críticos
     pontosCriticos: '',
@@ -378,6 +403,31 @@ export default function GuiaManual() {
     }));
   };
 
+  const getLaudasRange = (tipo: string) => {
+    switch (tipo) {
+      case 'guia':
+        return { min: 1, max: 20 };
+      case 'manual':
+        return { min: 1, max: 25 };
+      case 'ebook':
+        return { min: 5, max: 50 };
+      case 'livro_didatico':
+        return { min: 10, max: 80 };
+      case 'artigo':
+        return { min: 1, max: 15 };
+      default:
+        return { min: 1, max: 40 };
+    }
+  };
+
+  useEffect(() => {
+    const { min } = getLaudasRange(formData.tipoElementoEducacional);
+    setFormData(prev => ({
+      ...prev,
+      numeroPaginas: String(min),
+    }));
+  }, [formData.tipoElementoEducacional]);
+
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
     navigate('/');
@@ -391,8 +441,8 @@ export default function GuiaManual() {
   const validateForm = () => {
     const requiredFields = [
       'nomeEmpresa', 'nomeProjeto', 'responsavelNome', 'responsavelEmail',
-      'areaDepartamento', 'prazoEntrega', 'objetivo', 'tomVoz',
-      'cargo', 'escolaridade', 'dominioTecnico', 'quantidadeSecoes'
+      'areaDepartamento', 'objetivoConteudo', 'tomVoz', 'estiloLinguagem', 'tipoElementoEducacional',
+      'publicoCargo', 'escolaridade', 'dominioTecnico', 'quantidadeSecoes'
     ];
     
     for (const field of requiredFields) {
@@ -479,6 +529,12 @@ export default function GuiaManual() {
         department: formData.areaDepartamento,
         request_deadline: formData.prazoEntrega,
         delivery_deadline: formData.prazoEntrega, // Usando mesmo prazo por enquanto
+        objetivo_conteudo: formData.objetivoConteudo,
+        tipo_elemento_educacional: formData.tipoElementoEducacional,
+        estilo_linguagem: formData.estiloLinguagem,
+        publico_cargo: formData.publicoCargo,
+        estilo_visual: formData.estiloVisual,
+        numero_paginas: formData.numeroPaginas,
         user_email: user.email,
         status: 'aguardando_ingestao',
         form_data: formData,
@@ -570,29 +626,27 @@ export default function GuiaManual() {
   return (
     <>
       <style>{sliderStyles}</style>
+      <style>{formCardStyles}</style>
       <Header />
       
       <main className="main-content">
         {/* Hero Section */}
         <div className="welcome-section">
-          <div className="flex items-center justify-center mb-6">
+          <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
               <Map className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">
-            Briefing para Guia e Manual
-          </h1>
-          <p className="subtitle">
-            Forneça as informações necessárias para criarmos um guia ou manual completo e eficaz
-          </p>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-wide leading-tight text-slate-900 mb-2">Briefing para Criação</h1>
+          <div className="w-12 h-[3px] bg-primary-500 rounded-full mx-auto mt-3 mb-4"></div>
+          <p className="text-sm text-gray-600 tracking-tight">Forneça as informações necessárias para criarmos um Guia, Manual, E-book, Livro Didáticos ou Artigo</p>
         </div>
 
         {/* Back Navigation */}
         <div className="back-navigation mb-8">
           <button
             onClick={handleBack}
-            className="back-button flex items-center text-sm text-slate-600 hover:text-slate-900 transition-colors duration-200"
+            className="back-button flex items-center text-sm text-[#7A4CE0] hover:text-[#6939d6] transition-colors duration-200"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             Voltar à seleção
@@ -628,14 +682,14 @@ export default function GuiaManual() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Informações do Projeto */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mr-4">
-                <FileText className="w-5 h-5 text-slate-600" />
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <FileText className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Informações do Projeto</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Informações do Projeto</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="nomeEmpresa" className="block text-sm font-medium text-gray-700 mb-2">
                   Nome da Empresa
@@ -666,7 +720,7 @@ export default function GuiaManual() {
               </div>
               <div>
                 <label htmlFor="responsavelNome" className="block text-sm font-medium text-gray-700 mb-2">
-                  Responsável pelo Projeto
+                  Responsável
                 </label>
                 <input
                   type="text"
@@ -694,7 +748,7 @@ export default function GuiaManual() {
               </div>
               <div>
                 <label htmlFor="areaDepartamento" className="block text-sm font-medium text-gray-700 mb-2">
-                  Área/Departamento
+                  Produto/Departamento
                 </label>
                 <select
                   id="areaDepartamento"
@@ -717,48 +771,78 @@ export default function GuiaManual() {
                   <option value="pc">P&C</option>
                 </select>
               </div>
-              <div>
-                <label htmlFor="prazoEntrega" className="block text-sm font-medium text-gray-700 mb-2">
-                  Prazo de Entrega
-                </label>
-                <input
-                  type="date"
-                  id="prazoEntrega"
-                  name="prazoEntrega"
-                  value={formData.prazoEntrega}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+              
+          </div>
+        </div>
+
+        {/* Tipo de Elemento Educacional */}
+        <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+              <FileText className="w-5 h-5 text-[#7A4CE0]" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-800">Que tipo de elemento educacional você quer fazer?</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Guia', value: 'guia' },
+                { label: 'Manual', value: 'manual' },
+                { label: 'E-book', value: 'ebook' },
+                { label: 'Livro Didático', value: 'livro_didatico' },
+                { label: 'Artigo', value: 'artigo' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, tipoElementoEducacional: option.value }))}
+                  className={`
+                    inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium text-sm transition-all duration-150 ease-in-out
+                    ${formData.tipoElementoEducacional === option.value
+                      ? 'bg-[#EDE7FF] text-[#7C54FF] border-[rgba(124,84,255,0.45)] ring-1 ring-[rgba(122,76,224,0.20)] shadow-sm font-semibold'
+                      : 'bg-white text-[#4B4B4B] border-[rgba(124,84,255,0.25)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[rgba(124,84,255,0.06)] hover:border-[rgba(124,84,255,0.35)] hover:shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]'
+                    }
+                  `}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* 2. Objetivo do Conteúdo */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-4">
-                <Target className="w-5 h-5 text-orange-600" />
+          {/* Objetivo do Conteúdo (Taxonomia de Bloom) */}
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-12">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <Target className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Objetivo do Conteúdo</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Objetivo do Conteúdo</h2>
             </div>
             <div className="space-y-4">
-              <p className="text-sm text-gray-600 mb-6">Escolha apenas uma opção:</p>
+              <p className="text-sm text-gray-600 tracking-tight mb-7">Escolha apenas uma opção:</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {['Informar', 'Treinar', 'Avaliar'].map((option) => (
+                {[
+                  { label: 'Memorizar', value: 'memorizar' },
+                  { label: 'Compreender', value: 'compreender' },
+                  { label: 'Aplicar', value: 'aplicar' },
+                  { label: 'Analisar', value: 'analisar' },
+                  { label: 'Avaliar', value: 'avaliar' },
+                  { label: 'Criar', value: 'criar' },
+                ].map((option) => (
                   <button
-                    key={option}
+                    key={option.value}
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, objetivo: option.toLowerCase() }))}
+                    onClick={() => setFormData(prev => ({ ...prev, objetivoConteudo: option.value }))}
                     className={`
-                      px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200
-                      ${formData.objetivo === option.toLowerCase()
-                        ? 'bg-white text-orange-600 border-2 border-orange-500'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-300'
+                      inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium text-sm transition-all duration-150 ease-in-out
+                      ${formData.objetivoConteudo === option.value
+                        ? 'bg-[#EDE7FF] text-[#7C54FF] border-[rgba(124,84,255,0.45)] ring-1 ring-[rgba(122,76,224,0.20)] shadow-sm font-semibold'
+                        : 'bg-white text-[#4B4B4B] border-[rgba(124,84,255,0.25)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[rgba(124,84,255,0.06)] hover:border-[rgba(124,84,255,0.35)] hover:shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]'
                       }
                     `}
                   >
-                    {option}
+                    {option.label}
                   </button>
                 ))}
               </div>
@@ -766,30 +850,34 @@ export default function GuiaManual() {
           </div>
 
           {/* 3. Tom de Voz */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-4">
-                <Mic className="w-5 h-5 text-purple-600" />
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-12 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <Mic className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Tom de Voz</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Estilo de Linguagem</h2>
             </div>
             <div className="space-y-4">
-              <p className="text-sm text-gray-600 mb-6">Escolha apenas uma opção:</p>
+              <p className="text-sm text-gray-600 tracking-tight mb-7">Escolha apenas uma opção:</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {['Formal', 'Informal', 'Lúdico'].map((option) => (
+                {[
+                  { label: 'Dialógico', value: 'dialogico' },
+                  { label: 'Coloquial', value: 'coloquial' },
+                  { label: 'Formal', value: 'formal' },
+                ].map((option) => (
                   <button
-                    key={option}
+                    key={option.value}
                     type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, tomVoz: option.toLowerCase() }))}
+                    onClick={() => setFormData(prev => ({ ...prev, estiloLinguagem: option.value }))}
                     className={`
-                      px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200
-                      ${formData.tomVoz === option.toLowerCase()
-                        ? 'bg-white text-purple-600 border-2 border-purple-500'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-300'
+                      inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium text-sm transition-all duration-150 ease-in-out
+                      ${formData.estiloLinguagem === option.value
+                        ? 'bg-[#EDE7FF] text-[#7C54FF] border-[rgba(124,84,255,0.45)] ring-1 ring-[rgba(122,76,224,0.20)] shadow-sm font-semibold'
+                        : 'bg-white text-[#4B4B4B] border-[rgba(124,84,255,0.25)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[rgba(124,84,255,0.06)] hover:border-[rgba(124,84,255,0.35)] hover:shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]'
                       }
                     `}
                   >
-                    {option}
+                    {option.label}
                   </button>
                 ))}
               </div>
@@ -797,22 +885,20 @@ export default function GuiaManual() {
           </div>
 
           {/* 4. Público-Alvo */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                <Users className="w-5 h-5 text-green-600" />
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-12 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <Users className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Público-Alvo</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Público-Alvo</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               <div>
-                <label htmlFor="cargo" className="block text-sm font-medium text-gray-700 mb-2">
-                  Cargo *
-                </label>
+                <label htmlFor="publicoCargo" className="block text-sm font-medium text-gray-700 mb-2">Cargo:</label>
                 <select
-                  id="cargo"
-                  name="cargo"
-                  value={formData.cargo}
+                  id="publicoCargo"
+                  name="publicoCargo"
+                  value={formData.publicoCargo}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
@@ -826,12 +912,11 @@ export default function GuiaManual() {
                   <option value="especialista">Especialista</option>
                   <option value="assistente">Assistente</option>
                   <option value="tecnico">Técnico</option>
+                  <option value="toda_empresa">Toda a empresa</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="escolaridade" className="block text-sm font-medium text-gray-700 mb-2">
-                  Escolaridade *
-                </label>
+                <label htmlFor="escolaridade" className="block text-sm font-medium text-gray-700 mb-2">Escolaridade:</label>
                 <select
                   id="escolaridade"
                   name="escolaridade"
@@ -851,9 +936,7 @@ export default function GuiaManual() {
                 </select>
               </div>
               <div>
-                <label htmlFor="dominioTecnico" className="block text-sm font-medium text-gray-700 mb-2">
-                  Domínio Técnico *
-                </label>
+                <label htmlFor="dominioTecnico" className="block text-sm font-medium text-gray-700 mb-2">Domínio Técnico:</label>
                 <select
                   id="dominioTecnico"
                   name="dominioTecnico"
@@ -873,63 +956,101 @@ export default function GuiaManual() {
           </div>
 
           {/* 5. Quantidade de Seções */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                <Hash className="w-5 h-5 text-blue-600" />
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <Hash className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Quantidade de Seções</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Quantidade</h2>
             </div>
-            <div className="max-w-md">
-              <label htmlFor="quantidadeSecoes" className="block text-sm font-medium text-gray-700 mb-4">
-                Quantidade de Seções *
-              </label>
-              <div className="relative">
-                {/* Valor exibido */}
-                <div className="flex justify-center mb-4">
-                  <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-semibold text-lg min-w-[60px] text-center">
-                    {formData.quantidadeSecoes || 1}
-                  </div>
-                </div>
-                
-                {/* Slider */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="max-w-md">
+                <label htmlFor="quantidadeSecoes" className="block text-sm font-medium text-gray-700 mb-3">Quantidade de Seções:</label>
                 <div className="relative">
-                  <input
-                    type="range"
-                    id="quantidadeSecoes"
-                    name="quantidadeSecoes"
-                    value={formData.quantidadeSecoes || 1}
-                    onChange={handleInputChange}
-                    min="1"
-                    max="20"
-                    required
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    style={{
-                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((Number(formData.quantidadeSecoes) || 1) - 1) * 100 / 19}%, #e5e7eb ${((Number(formData.quantidadeSecoes) || 1) - 1) * 100 / 19}%, #e5e7eb 100%)`
-                    }}
-                  />
-                  
-                  {/* Marcadores de valores */}
-                  <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>1</span>
-                    <span>5</span>
-                    <span>10</span>
-                    <span>15</span>
-                    <span>20</span>
+                  <div className="flex justify-center mb-2">
+                    <div className="bg-[rgba(122,76,224,0.12)] text-[#7A4CE0] px-[18px] py-[10px] rounded-full font-semibold text-lg min-w-[60px] text-center shadow-[0_2px_8px_rgba(122,76,224,0.25)]">
+                      {formData.quantidadeSecoes || 1}
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="range"
+                      id="quantidadeSecoes"
+                      name="quantidadeSecoes"
+                      value={formData.quantidadeSecoes || 1}
+                      onChange={handleInputChange}
+                      min="1"
+                      max="20"
+                      required
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      style={{
+                        background: `linear-gradient(to right, #7A4CE0 0%, #7A4CE0 ${((Number(formData.quantidadeSecoes) || 1) - 1) * 100 / 19}%, #E5E5E5 ${((Number(formData.quantidadeSecoes) || 1) - 1) * 100 / 19}%, #E5E5E5 100%)`
+                      }}
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>1</span>
+                      <span>5</span>
+                      <span>10</span>
+                      <span>15</span>
+                      <span>20</span>
+                    </div>
                   </div>
                 </div>
+                <p className="text-sm text-gray-500 mt-3 text-center">Arraste para selecionar a quantidade de seções</p>
               </div>
-              <p className="text-sm text-gray-500 mt-3 text-center">Arraste para selecionar de 1 a 20 seções</p>
+              <div>
+                <label htmlFor="numeroPaginas" className="block text-sm font-medium text-gray-700 mb-3">Número Máximo de Laudas:</label>
+                <div className="relative">
+                  <div className="flex justify-center mb-2">
+                    <div className="bg-[rgba(122,76,224,0.12)] text-[#7A4CE0] px-[18px] py-[10px] rounded-full font-semibold text-lg min-w-[60px] text-center shadow-[0_2px_8px_rgba(122,76,224,0.25)]">
+                      {Number(formData.numeroPaginas) || getLaudasRange(formData.tipoElementoEducacional).min}
+                    </div>
+                  </div>
+                  <div className="relative">
+                    {
+                      (() => {
+                        const { min, max } = getLaudasRange(formData.tipoElementoEducacional);
+                        const current = Number(formData.numeroPaginas) || min;
+                        const percent = ((current - min) * 100) / (max - min);
+                        const marks = [min, Math.round(min + (max - min) * 0.25), Math.round(min + (max - min) * 0.5), Math.round(min + (max - min) * 0.75), max];
+                        return (
+                          <>
+                            <input
+                              type="range"
+                              id="numeroPaginas"
+                              name="numeroPaginas"
+                              value={current}
+                              onChange={handleInputChange}
+                              min={min}
+                              max={max}
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                              style={{
+                                background: `linear-gradient(to right, #7A4CE0 0%, #7A4CE0 ${percent}%, #E5E5E5 ${percent}%, #E5E5E5 100%)`
+                              }}
+                            />
+                            <div className="flex justify-between text-xs text-gray-500 mt-1">
+                              {marks.map(m => (
+                                <span key={m}>{m}</span>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()
+                    }
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mt-2 text-center">Selecione a quantidade aproximada de laudas desejadas para o conteúdo.</p>
+              </div>
             </div>
           </div>
 
           {/* 6. Pontos Críticos */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-4">
-                <AlertCircle className="w-5 h-5 text-red-600" />
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <AlertCircle className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Pontos Críticos</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Pontos Críticos</h2>
             </div>
             <div>
               <label htmlFor="pontosCriticos" className="block text-sm font-medium text-gray-700 mb-2">
@@ -948,26 +1069,26 @@ export default function GuiaManual() {
           </div>
 
           {/* 7. Estilo Visual */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center mr-4">
-                <Palette className="w-5 h-5 text-pink-600" />
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-12">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <Palette className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Estilo Visual</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Estilo Visual</h2>
             </div>
             <div className="space-y-4">
-              <p className="text-sm text-gray-600 mb-6">Selecione os elementos visuais desejados (pode escolher várias opções):</p>
+              <p className="text-sm text-gray-600 tracking-tight mb-7">Selecione os elementos visuais desejados (pode escolher várias opções):</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[{label: 'Ícones', value: 'icones'}, {label: 'Ilustrações', value: 'ilustracoes'}, {label: 'Cores Institucionais', value: 'coresInstitucionais'}].map((option) => (
+                {[{label: 'Ícones', value: 'icones'}, {label: 'Ilustrações', value: 'ilustracoes'}, {label: 'Fotos', value: 'fotos'}, {label: 'Cartoon', value: 'cartoon'}, {label: 'Lettering', value: 'lettering'}, {label: '3D', value: '3d'}].map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => handleCheckboxChange(option.value)}
                     className={`
-                      px-6 py-3 rounded-lg font-medium text-sm transition-all duration-200
+                      inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium text-sm transition-all duration-150 ease-in-out
                       ${formData.estiloVisual.includes(option.value)
-                        ? 'bg-white text-pink-600 border-2 border-pink-500'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-300'
+                        ? 'bg-[#EDE7FF] text-[#7C54FF] border-[rgba(124,84,255,0.45)] ring-1 ring-[rgba(122,76,224,0.20)] shadow-sm font-semibold'
+                        : 'bg-white text-[#4B4B4B] border-[rgba(124,84,255,0.25)] shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[rgba(124,84,255,0.06)] hover:border-[rgba(124,84,255,0.35)] hover:shadow-[inset_0_1px_3px_rgba(0,0,0,0.08)]'
                       }
                     `}
                   >
@@ -981,21 +1102,21 @@ export default function GuiaManual() {
 
 
           {/* 8. Anexar documentos base */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-300">
-            <div className="flex items-center mb-6">
-              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mr-4">
-                <Upload className="w-5 h-5 text-yellow-600" />
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <Upload className="w-5 h-5 text-[#7A4CE0]" />
               </div>
-              <h2 className="text-2xl font-semibold text-slate-900">Anexar documentos base</h2>
+              <h2 className="text-lg font-semibold text-gray-800">Anexar documentos base</h2>
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-4">Envie arquivos de referência para o projeto:</p>
+              <p className="text-sm text-gray-600 tracking-tight mb-4">Envie arquivos de referência para o projeto:</p>
               <FileUpload
                 files={formData.anexos}
                 onFilesChange={handleFilesChange}
               />
               <div className="mt-4 text-center">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 tracking-tight">
                   Apenas arquivos que não foram estruturados
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
@@ -1010,7 +1131,8 @@ export default function GuiaManual() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="bg-orange-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[200px]"
+              className="h-11 px-5 py-2.5 rounded-xl bg-[#7A4CE0] text-white shadow-md font-medium text-base inline-flex items-center justify-center transition-all duration-200 ease-out hover:bg-[#6B3DD8] hover:shadow-lg hover:-translate-y-0.5 active:scale-95 active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed min-w-[220px]"
+              style={{ boxShadow: '0 4px 12px rgba(122, 76, 224, 0.20)' }}
             >
               {isSubmitting ? (
                 <div className="flex items-center justify-center">
@@ -1018,11 +1140,17 @@ export default function GuiaManual() {
                   {submitProgress || 'Enviando...'}
                 </div>
               ) : (
-                'Enviar Briefing'
+                <span className="inline-flex items-center">
+                  Enviar Briefing
+                  <SendHorizontal className="w-[16px] h-[16px] ml-[6px] text-white" />
+                </span>
               )}
             </button>
             {isSubmitting && submitProgress && (
               <p className="text-sm text-gray-600 mt-2">{submitProgress}</p>
+            )}
+            {!isSubmitting && (
+              <p className="text-sm text-gray-600 mt-4">Você poderá editar este briefing depois.</p>
             )}
           </div>
 

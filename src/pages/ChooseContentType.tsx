@@ -45,7 +45,7 @@ export default function ChooseContentType() {
             <div className="card-icon">
               <i className="fas fa-graduation-cap"></i>
             </div>
-            <h3>Elementos de Aprendizagem</h3>
+            <h3>Escrita de Conteúdo</h3>
             <p>Desenvolva conteúdos que explicam, orientam e facilitam a jornada de criação.</p>
           </a>
           
@@ -53,7 +53,7 @@ export default function ChooseContentType() {
             <div className="card-icon">
               <i className="fas fa-search"></i>
             </div>
-            <h3>Ferramentas de Revisão</h3>
+            <h3>Ferramentas de Apoio</h3>
             <p>Ferramentas para validar e refinar com foco em qualidade e inclusão.</p>
           </a>
         </div>

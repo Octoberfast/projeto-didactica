@@ -3,7 +3,7 @@ import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
 
-export default function FerramentasPlanejamento() {
+function FerramentasPlanejamento() {
   useEffect(() => {
     // Protect this route - require authentication
     const checkAuth = async () => {
@@ -52,19 +52,11 @@ export default function FerramentasPlanejamento() {
             <div className="tool-icon">
               <i className="fas fa-clipboard-check"></i>
             </div>
-            <h3>Checklist de Variáveis para Briefing</h3>
+            <h3>Matriz</h3>
             <p>Lista estruturada de verificação com todas as variáveis essenciais que devem ser consideradas e documentadas durante a fase de briefing do projeto educacional.</p>
           </div>
 
-          <div className="tool-card">
-            <a href="/transcricao" className="block">
-              <div className="tool-icon">
-                <i className="fas fa-microphone-lines"></i>
-              </div>
-              <h3>Transcrição</h3>
-              <p>Ferramenta que converte automaticamente áudios e vídeos em texto, facilitando o acesso, análise e documentação do conteúdo falado. Ideal para criar registros de reuniões, legendas, materiais de estudo e acessibilidade em projetos educacionais.</p>
-            </a>
-          </div>
+          
         </div>
         
         <div className="help-section">
@@ -82,3 +74,5 @@ export default function FerramentasPlanejamento() {
     </>
   )
 }
+
+export default FerramentasPlanejamento

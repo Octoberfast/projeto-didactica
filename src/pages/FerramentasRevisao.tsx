@@ -34,7 +34,7 @@ const FerramentasRevisao: React.FC = () => {
         </div>
         
         <div className="welcome-section">
-          <h1>Ferramentas de Revisão</h1>
+          <h1>Ferramentas de Apoio</h1>
           <p className="subtitle">
             Ferramentas para validar e refinar seu conteúdo com foco em qualidade, inclusão e adequação ao público-alvo.
           </p>
@@ -43,22 +43,44 @@ const FerramentasRevisao: React.FC = () => {
         <div className="tools-grid">
           <div className="tool-card">
             <div className="tool-icon">
-              <i className="fas fa-universal-access"></i>
+              <i className="fas fa-spell-check"></i>
             </div>
-            <h3>Acessibilidade e Inclusão</h3>
-            <p>
-              Conjunto de diretrizes e verificações para garantir que o conteúdo seja acessível a pessoas com diferentes necessidades e habilidades, promovendo a inclusão digital e educacional.
-            </p>
+            <h3>Revisão Ortográfica</h3>
+            <p>Ferramenta que verifica automaticamente ortografia, gramática e coerência textual, garantindo clareza, precisão e acessibilidade. Ideal para elevar a qualidade linguística de materiais educacionais e comunicacionais.</p>
           </div>
           
           <div className="tool-card">
             <div className="tool-icon">
               <i className="fas fa-layer-group"></i>
             </div>
-            <h3>Adaptação Linguística por Nível Hierárquico</h3>
-            <p>
-              Ferramenta para ajustar a linguagem, tom e complexidade do conteúdo de acordo com diferentes níveis hierárquicos organizacionais, garantindo comunicação efetiva.
-            </p>
+            <h3>Feedback de Telas</h3>
+            <p>Avaliação estruturada da clareza visual, hierarquia da informação e consistência do layout. Auxilia na criação de interfaces educacionais mais intuitivas, acessíveis e alinhadas às boas práticas de design instrucional.</p>
+          </div>
+
+          <div className="tool-card">
+            <a href="/transcricao" className="block">
+              <div className="tool-icon">
+                <i className="fas fa-microphone-lines"></i>
+              </div>
+              <h3>Transcrição</h3>
+              <p>Ferramenta que converte automaticamente áudios e vídeos em texto organizado, facilitando estudo, registro e documentação. Ideal para transformar conteúdos audiovisuais em materiais acessíveis e reutilizáveis.</p>
+            </a>
+          </div>
+
+          <div className="tool-card">
+            <div className="tool-icon">
+              <i className="fas fa-code"></i>
+            </div>
+            <h3>Validador de Programação</h3>
+            <p>Analisa códigos para identificar erros, vulnerabilidades, problemas de estilo e oportunidades de otimização. Garante padronização técnica e eleva a qualidade de materiais interativos e educacionais baseados em lógica computacional.</p>
+          </div>
+
+          <div className="tool-card">
+            <div className="tool-icon">
+              <i className="fas fa-film"></i>
+            </div>
+            <h3>Decodificador de Vídeo</h3>
+            <p>Ferramenta que interpreta e extrai informações relevantes de vídeos, gerando resumos, insights e estruturação de conteúdo. Auxilia na criação de materiais didáticos a partir de recursos audiovisuais.</p>
           </div>
         </div>
         

@@ -40,52 +40,53 @@ export default function ElementosAprendizagem() {
         </div>
         
         <div className="tools-grid">
+          <a href="/guia-manual" className="tool-card">
+            <div className="tool-icon">
+              <i className="fas fa-book"></i>
+            </div>
+            <h3>Guias, Manuais, E-Books, Artigos</h3>
+            <p>Documentação passo a passo para orientar processos, procedimentos ou uso de ferramentas de forma clara e objetiva.</p>
+          </a>
           <div className="tool-card">
             <div className="tool-icon">
-              <i className="fas fa-book-open"></i>
+              <i className="fas fa-video"></i>
             </div>
-            <h3>E-book</h3>
+            <h3>Live Action, Motion</h3>
             <p>Formato digital interativo para apresentar conteúdos educacionais de forma estruturada, com recursos multimídia e navegação intuitiva.</p>
           </div>
           
           <div className="tool-card">
             <div className="tool-icon">
-              <i className="fas fa-book"></i>
+              <i className="fas fa-headphones"></i>
             </div>
-            <h3>Livro Didático</h3>
-            <p>Material educacional completo e estruturado, organizado em capítulos com exercícios, exemplos práticos e conteúdo progressivo.</p>
+            <h3>Podcasts</h3>
+            <p>Conteúdos em áudio desenvolvidos para estudo flexível, com explicações, debates, entrevistas e aprofundamentos acessíveis em qualquer lugar.</p>
           </div>
           
           <div className="tool-card">
             <div className="tool-icon">
-              <i className="fas fa-question-circle"></i>
+              <i className="fas fa-puzzle-piece"></i>
             </div>
-            <h3>FAQ (Perguntas Frequentes)</h3>
-            <p>Compilação organizada das dúvidas mais comuns com respostas claras e diretas para facilitar o acesso à informação.</p>
+            <h3>Jogos, Quizzes</h3>
+            <p>Atividades interativas para reforçar o aprendizado, testar conhecimentos e promover engajamento de forma leve e divertida.</p>
           </div>
           
-          <a href="/guia-manual" className="tool-card">
-            <div className="tool-icon">
-              <i className="fas fa-map"></i>
-            </div>
-            <h3>Guia &amp; Manual</h3>
-            <p>Documentação passo a passo para orientar processos, procedimentos ou uso de ferramentas de forma clara e objetiva.</p>
-          </a>
+          
           
           <div className="tool-card">
             <div className="tool-icon">
               <i className="fas fa-mouse-pointer"></i>
             </div>
             <h3>Conteúdo Interativo (OnePage / Rise)</h3>
-            <p>Experiências de aprendizagem dinâmicas com elementos interativos, animações e navegação não-linear para engajamento máximo.</p>
+            <p>Experiências de aprendizado com navegação não-linear, animações, elementos clicáveis e recursos interativos que elevam o engajamento.</p>
           </div>
           
           <div className="tool-card">
             <div className="tool-icon">
               <i className="fas fa-desktop"></i>
             </div>
-            <h3>Tutoriais de Sistema</h3>
-            <p>Instruções visuais e práticas para ensinar o uso de softwares, plataformas ou sistemas específicos através de demonstrações.</p>
+            <h3>Treinamento e Slides</h3>
+            <p>Materiais visuais e tutoriais práticos para ensinar o uso de sistemas, ferramentas e processos por meio de demonstrações claras e objetivas.</p>
           </div>
         </div>
         

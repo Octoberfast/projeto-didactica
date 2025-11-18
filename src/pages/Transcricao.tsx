@@ -258,9 +258,6 @@ export default function Transcricao() {
           // Inserir tarefa no Dashboard (project_requests)
           try {
             if (user.email) {
-              const today = new Date()
-              // Formato YYYY-MM-DD para campos DATE
-              const dateStr = today.toISOString().slice(0, 10)
               const responsible = (user.user_metadata?.name as string) || (user.email as string)
 
               await supabase
@@ -270,10 +267,13 @@ export default function Transcricao() {
                   project_name: form.nomeProjeto,
                   responsible,
                   department: 'Transcrição',
-                  request_deadline: dateStr,
-                  delivery_deadline: dateStr,
-                  status: 'em_andamento',
+                  status: 'aguardando_ingestao',
                   user_email: user.email,
+                  form_data: {
+                    nomeEmpresa: form.nomeEmpresa,
+                    nomeProjeto: form.nomeProjeto,
+                    tipo: 'transcricao'
+                  }
                 })
             } else {
               console.warn('Usuário autenticado sem e-mail. Ignorando inserção em project_requests devido a política RLS.')

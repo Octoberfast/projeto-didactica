@@ -13,7 +13,7 @@ interface ProjectRequest {
   department: string
   request_deadline: string
   delivery_deadline: string
-  status: 'em_andamento' | 'concluido'
+  status: 'em_andamento' | 'concluido' | 'aguardando_ingestao'
   user_email: string
   created_at: string
   origin_id?: string
@@ -21,7 +21,7 @@ interface ProjectRequest {
 }
 
 interface DashboardFilters {
-  status: 'rascunho' | 'em_progresso' | 'concluido' | 'todos'
+  status: 'rascunho' | 'em_andamento' | 'concluido' | 'aguardando_ingestao' | 'todos'
   sortBy: 'created_at' | 'title'
   sortOrder: 'asc' | 'desc'
 }
@@ -154,7 +154,7 @@ export default function Dashboard() {
           .from('project_requests')
           .select('*', { count: 'exact', head: true })
           .eq('user_email', user.email!)
-          .eq('status', 'em_andamento')
+          .in('status', ['em_andamento', 'aguardando_ingestao'])
 
         if (error) {
           console.error('Erro ao contar projetos em andamento:', error)
@@ -187,23 +187,8 @@ export default function Dashboard() {
         throw error
       }
 
-      // Ordenar projetos: 'Em Andamento' primeiro, depois 'Concluído'
-      const sortedProjects = (data || []).sort((a, b) => {
-        // Prioridade: em_andamento = 0, concluido = 1
-        const statusOrder = { em_andamento: 0, concluido: 1 }
-        const aOrder = statusOrder[a.status] ?? 2
-        const bOrder = statusOrder[b.status] ?? 2
-        
-        if (aOrder !== bOrder) {
-          return aOrder - bOrder
-        }
-        
-        // Se o status for igual, ordenar por data de criação (mais recente primeiro)
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      })
-
-      setProjects(sortedProjects)
-      setFilteredProjects(sortedProjects)
+      setProjects(data || [])
+      setFilteredProjects(data || [])
     } catch (err) {
       console.error('Erro ao buscar projetos:', err)
       setError('Erro ao carregar projetos. Tente novamente.')
@@ -354,9 +339,9 @@ export default function Dashboard() {
                     className="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="todos">Todos</option>
-                    <option value="rascunho">Rascunho</option>
-                    <option value="em_progresso">Em Progresso</option>
-                    <option value="concluido">Concluído</option>
+                  <option value="aguardando_ingestao">Aguardando Ingestão</option>
+                  <option value="em_andamento">Em Andamento</option>
+                  <option value="concluido">Concluído</option>
                   </select>
                 </div>
 
@@ -540,7 +525,9 @@ export default function Dashboard() {
                             ) : (
                               <Clock className="w-3 h-3 mr-1" />
                             )}
-                            {project.status === 'em_andamento' ? 'Em progresso' : 'Concluído'}
+                            {project.status === 'em_andamento' ? 'Em Andamento' : 
+                             project.status === 'aguardando_ingestao' ? 'Aguardando Ingestão' : 
+                             'Concluído'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -587,7 +574,9 @@ export default function Dashboard() {
                         ) : (
                           <Clock className="w-3 h-3 mr-1" />
                         )}
-                        {project.status === 'em_andamento' ? 'Em progresso' : 'Concluído'}
+                        {project.status === 'em_andamento' ? 'Em Andamento' : 
+                         project.status === 'aguardando_ingestao' ? 'Aguardando Ingestão' : 
+                         'Concluído'}
                       </span>
                     </div>
 

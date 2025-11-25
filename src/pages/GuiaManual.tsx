@@ -6,7 +6,6 @@ import Footer from '../components/Footer'
 import { supabase } from '../lib/supabaseClient'
 import type { User } from '@supabase/supabase-js'
 
-// Componente simples de upload de arquivos
 interface FileUploadProps {
   files: File[];
   onFilesChange: (files: File[]) => void;
@@ -14,11 +13,50 @@ interface FileUploadProps {
 
 function FileUpload({ files, onFilesChange }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const MAX_BYTES = 100 * 1024 * 1024;
+  const allowedExtensions = ['pdf','doc','docx','txt','ppt','pptx','xls','xlsx','csv','rtf','odt','ods','odp','png','jpg','jpeg'];
+  const allowedTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/csv',
+    'application/rtf',
+    'application/vnd.oasis.opendocument.text',
+    'application/vnd.oasis.opendocument.spreadsheet',
+    'application/vnd.oasis.opendocument.presentation',
+    'image/png',
+    'image/jpeg'
+  ];
+  const validateLocal = (f: File) => {
+    const extension = f.name.split('.').pop()?.toLowerCase() || '';
+    if (f.size > MAX_BYTES) return `O arquivo "${f.name}" excede 100MB.`;
+    if (!allowedExtensions.includes(extension)) return `Formato não permitido para "${f.name}".`;
+    if (!allowedTypes.includes(f.type)) return `Tipo MIME inválido para "${f.name}".`;
+    return null;
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      onFilesChange([...files, ...newFiles]);
+      const validFiles: File[] = [];
+      for (const f of newFiles) {
+        const v = validateLocal(f);
+        if (v) {
+          setErrorMsg(v);
+          continue;
+        }
+        validFiles.push(f);
+      }
+      if (validFiles.length) {
+        onFilesChange([...files, ...validFiles]);
+        setErrorMsg(null);
+      }
     }
   };
 
@@ -51,16 +89,17 @@ function FileUpload({ files, onFilesChange }: FileUploadProps) {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const newFiles = Array.from(e.dataTransfer.files);
-      // Filtrar apenas arquivos aceitos
-      const acceptedFiles = newFiles.filter(file => {
-        const extension = file.name.split('.').pop()?.toLowerCase();
-        return ['pdf', 'doc', 'docx', 'txt'].includes(extension || '');
-      });
-      
-      if (acceptedFiles.length > 0) {
-        onFilesChange([...files, ...acceptedFiles]);
+      const validFiles: File[] = [];
+      let firstError: string | null = null;
+      for (const f of newFiles) {
+        const v = validateLocal(f);
+        if (v && !firstError) firstError = v;
+        if (!v) validFiles.push(f);
       }
-      
+      if (validFiles.length > 0) {
+        onFilesChange([...files, ...validFiles]);
+      }
+      setErrorMsg(firstError);
       e.dataTransfer.clearData();
     }
   };
@@ -81,7 +120,7 @@ function FileUpload({ files, onFilesChange }: FileUploadProps) {
         <input
           type="file"
           multiple
-          accept=".pdf,.doc,.docx,.txt"
+          accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.xls,.xlsx,.csv,.rtf,.odt,.ods,.odp,.png,.jpg,.jpeg"
           onChange={handleFileChange}
           className="hidden"
           id="file-upload"
@@ -89,8 +128,15 @@ function FileUpload({ files, onFilesChange }: FileUploadProps) {
         <label htmlFor="file-upload" className="cursor-pointer">
           <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
           <p className="text-sm text-gray-600">Clique para selecionar arquivos ou arraste aqui</p>
+          <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">Máximo 100MB por arquivo</div>
         </label>
       </div>
+      {errorMsg && (
+        <div className="flex items-center gap-2 text-red-700 bg-red-100 border border-red-200 rounded-lg px-3 py-2">
+          <AlertCircle className="w-4 h-4" />
+          <span className="text-sm">{errorMsg}</span>
+        </div>
+      )}
       
       {files.length > 0 && (
         <div className="space-y-2">
@@ -400,6 +446,8 @@ export default function GuiaManual() {
   const [submitProgress, setSubmitProgress] = useState('')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [showErrorModal, setShowErrorModal] = useState(false)
+  const [uploadTotal, setUploadTotal] = useState(0)
+  const [uploadIndex, setUploadIndex] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const navigate = useNavigate()
   
@@ -500,21 +548,31 @@ export default function GuiaManual() {
   };
 
   const validateFiles = () => {
-    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    const maxFileSize = 100 * 1024 * 1024;
     const allowedTypes = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain'
+      'text/plain',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'application/rtf',
+      'application/vnd.oasis.opendocument.text',
+      'application/vnd.oasis.opendocument.spreadsheet',
+      'application/vnd.oasis.opendocument.presentation',
+      'image/png',
+      'image/jpeg'
     ];
 
     for (const file of formData.anexos) {
       if (file.size > maxFileSize) {
-        throw new Error(`O arquivo "${file.name}" excede o tamanho máximo de 10MB.`);
+        throw new Error(`O arquivo "${file.name}" excede o tamanho máximo de 100MB.`);
       }
-      
       if (!allowedTypes.includes(file.type)) {
-        throw new Error(`O arquivo "${file.name}" não é um tipo permitido. Use apenas PDF, DOC, DOCX ou TXT.`);
+        throw new Error(`O arquivo "${file.name}" não é um tipo permitido.`);
       }
     }
   };
@@ -572,15 +630,17 @@ export default function GuiaManual() {
 
       const projectId = projectResult.id;
 
-      // 2. Upload de arquivos com nomenclatura única
       if (formData.anexos.length > 0) {
-        setSubmitProgress(`Enviando arquivos (0/${formData.anexos.length})...`);
+        setSubmitProgress(`Enviando arquivos (0/${formData.anexos.length})...`)
+        setUploadTotal(formData.anexos.length)
+        setUploadIndex(0)
       }
       
       const uploadedFiles = [];
       for (let i = 0; i < formData.anexos.length; i++) {
         const file = formData.anexos[i];
-        setSubmitProgress(`Enviando arquivos (${i + 1}/${formData.anexos.length}): ${file.name}...`);
+        setSubmitProgress(`Enviando arquivos (${i + 1}/${formData.anexos.length}): ${file.name}...`)
+        setUploadIndex(i + 1)
         
         // Substitui espaços e caracteres problemáticos
         const sanitizedName = file.name.replace(/[^\w.-]/g, '_');
@@ -635,6 +695,8 @@ export default function GuiaManual() {
     } finally {
       setIsSubmitting(false)
       setSubmitProgress('')
+      setUploadTotal(0)
+      setUploadIndex(0)
     }
   }
 
@@ -1139,7 +1201,7 @@ export default function GuiaManual() {
                   Apenas arquivos que não foram estruturados
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Formatos aceitos: PDF, DOC, DOCX, TXT (máximo 10MB por arquivo)
+                  Formatos aceitos: PDF, DOC, DOCX, TXT, PPT, PPTX, XLS, XLSX, CSV, RTF, ODT, ODS, ODP, PNG, JPG (máximo 100MB por arquivo)
                 </p>
               </div>
             </div>
@@ -1166,7 +1228,17 @@ export default function GuiaManual() {
               )}
             </button>
             {isSubmitting && submitProgress && (
-              <p className="text-sm text-gray-600 mt-2">{submitProgress}</p>
+              <div className="mt-2">
+                <p className="text-sm text-gray-600">{submitProgress}</p>
+                {uploadTotal > 0 && (
+                  <div className="mt-2 h-2 bg-gray-200 rounded">
+                    <div
+                      className="h-2 bg-[#7A4CE0] rounded"
+                      style={{ width: `${Math.min(100, Math.round((uploadIndex / uploadTotal) * 100))}%` }}
+                    ></div>
+                  </div>
+                )}
+              </div>
             )}
             {!isSubmitting && (
               <p className="text-sm text-gray-600 mt-4">Você poderá editar este briefing depois.</p>

@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckCircle, Target, Users, Map, Palette, ArrowLeft, Hash, AlertCircle, Upload, FileText, Mic, Copy, SendHorizontal } from 'lucide-react'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
+import { Tooltip } from '../components/Tooltip'
+import { SummaryBuilder } from '../components/SummaryBuilder'
+import { TocItem, SummaryData } from '../types/summary'
 import { supabase } from '../lib/supabaseClient'
 import type { User } from '@supabase/supabase-js'
 
@@ -342,7 +345,7 @@ export default function GuiaManual() {
     return () => {
       document.head.removeChild(styleElement);
     };
-  }, []);
+  }, [pushableButtonStyles]);
 
   // Obter usuário logado
   useEffect(() => {
@@ -383,17 +386,45 @@ export default function GuiaManual() {
 
 
           objetivo: originalData.objetivo || '',
+          tipoElementoEducacional: originalData.tipoElementoEducacional || '',
+          estiloLinguagem: originalData.estiloLinguagem || '',
           cargo: originalData.cargo || '',
-          publicoCargo: originalData.cargo || '',
+          publicoCargo: originalData.publicoCargo || '',
           escolaridade: originalData.escolaridade || '',
           dominioTecnico: originalData.dominioTecnico || '',
-          quantidadeSecoes: originalData.quantidadeSecoes || '',
-          numeroPaginas: originalData.numeroPaginas || '',
+          quantidadeSecoes: originalData.quantidadeSecoes || '0',
+          numeroPaginas: originalData.numeroPaginas || '0',
           pontosCriticos: originalData.pontosCriticos || '',
           estiloVisual: originalData.estiloVisual || [],
           // anexos permanecem vazios conforme solicitado
           anexos: []
         }))
+        
+        // Definir estados de modo automático com base nos dados carregados
+        // Se o valor for 0 ou não houver valor definido, manter como automático
+        setIsAutoSections(!originalData.quantidadeSecoes || Number(originalData.quantidadeSecoes) === 0)
+        setIsAutoPages(!originalData.numeroPaginas || Number(originalData.numeroPaginas) === 0)
+        
+        // Carregar dados do sumário se existirem no projeto original
+        if (project.summary_data) {
+          setSummaryDataPayload(project.summary_data)
+          setIsSummaryExpanded(true)
+          
+          // Extrair itens do sumário para o componente SummaryBuilder
+          if (project.summary_data.structure && project.summary_data.structure.body) {
+            const items = project.summary_data.structure.body.map((item: any) => ({
+              id: item.id,
+              title: item.title,
+              type: item.type
+            }));
+            setSummaryItems(items);
+            console.log('Itens do sumário extraídos:', items);
+          }
+          
+          console.log('Dados do sumário carregados:', project.summary_data)
+        } else {
+          console.log('Nenhum dado de sumário encontrado no projeto original')
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do projeto original:', error)
@@ -429,8 +460,8 @@ export default function GuiaManual() {
     dominioTecnico: '',
     
     // 5. Quantidade de Seções
-    quantidadeSecoes: '',
-    numeroPaginas: '',
+    quantidadeSecoes: '0',
+    numeroPaginas: '0',
     
     // 6. Pontos Críticos
     pontosCriticos: '',
@@ -445,17 +476,56 @@ export default function GuiaManual() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitProgress, setSubmitProgress] = useState('')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successMessage] = useState('')
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [uploadTotal, setUploadTotal] = useState(0)
   const [uploadIndex, setUploadIndex] = useState(0)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const navigate = useNavigate()
   
+  // Estados para controle do modo automático dos sliders
+  const [isAutoSections, setIsAutoSections] = useState(true)
+  const [isAutoPages, setIsAutoPages] = useState(true)
+  
   // Estados para modo de reutilização
   const [searchParams] = useSearchParams()
   const [isReuseMode, setIsReuseMode] = useState(false)
   const [originalProjectId, setOriginalProjectId] = useState<string | null>(null)
   const [isLoadingOriginalData, setIsLoadingOriginalData] = useState(false)
+  
+  
+  
+  // Estado para controlar se o usuário está tentando acessar a página Sumário
+  const [isNavigatingToSummary, setIsNavigatingToSummary] = useState(false)
+  
+  // Estado para controlar expansão do card Sumário
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false)
+  
+  // Estado para controlar os itens do sumário
+  const [summaryItems, setSummaryItems] = useState<TocItem[]>([])
+  
+  // Estado para armazenar os dados formatados do sumário para envio
+  const [summaryDataPayload, setSummaryDataPayload] = useState<SummaryData | null>(null)
+  
+  // Função para formatar e atualizar os dados do sumário quando houver mudanças
+  const handleSummaryDataChange = useCallback((items: TocItem[]) => {
+    const summaryData: SummaryData = {
+      meta: {
+        generatedAt: new Date().toISOString(),
+        application: "Didáctica Sumário v1.0"
+      },
+      structure: {
+        preTextual: [],
+        body: items.map((item, index) => ({
+          order: index + 1,
+          ...item
+        })),
+        postTextual: []
+      }
+    };
+    
+    setSummaryDataPayload(summaryData);
+  }, []);
 
   // Detectar modo de reutilização
   useEffect(() => {
@@ -473,6 +543,53 @@ export default function GuiaManual() {
       ...prev,
       [name]: value
     }))
+    
+    // Se o usuário interagir com os sliders, sair do modo automático
+    if (name === 'quantidadeSecoes' && isAutoSections) {
+      setIsAutoSections(false)
+    }
+    if (name === 'numeroPaginas' && isAutoPages) {
+      setIsAutoPages(false)
+    }
+  }
+  
+  // Funções para lidar especificamente com os sliders
+  const handleSectionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number(e.target.value)
+    
+    // Se o valor for 0, ativa o modo automático
+    if (value === 0) {
+      setIsAutoSections(true)
+      setFormData(prev => ({
+        ...prev,
+        quantidadeSecoes: '0'
+      }))
+    } else {
+      // Se o valor for maior que 0, desativa o modo automático
+      if (isAutoSections) {
+        setIsAutoSections(false)
+      }
+      handleInputChange(e)
+    }
+  }
+  
+  const handlePagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number(e.target.value)
+    
+    // Se o valor for 0, ativa o modo automático
+    if (value === 0) {
+      setIsAutoPages(true)
+      setFormData(prev => ({
+        ...prev,
+        numeroPaginas: '0'
+      }))
+    } else {
+      // Se o valor for maior que 0, desativa o modo automático
+      if (isAutoPages) {
+        setIsAutoPages(false)
+      }
+      handleInputChange(e)
+    }
   }
 
   const handleCheckboxChange = (value: string) => {
@@ -509,12 +626,15 @@ export default function GuiaManual() {
   };
 
   useEffect(() => {
-    const { min } = getLaudasRange(formData.tipoElementoEducacional);
-    setFormData(prev => ({
-      ...prev,
-      numeroPaginas: String(min),
-    }));
-  }, [formData.tipoElementoEducacional]);
+    // Só atualiza o numeroPaginas se não estiver em modo automático
+    if (!isAutoPages) {
+      const { min } = getLaudasRange(formData.tipoElementoEducacional);
+      setFormData(prev => ({
+        ...prev,
+        numeroPaginas: String(min),
+      }));
+    }
+  }, [formData.tipoElementoEducacional, isAutoPages]);
 
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
@@ -527,10 +647,19 @@ export default function GuiaManual() {
   };
 
   const validateForm = () => {
+    // Exceção do módulo de Sumário: quando for navegação para o Sumário ou
+    // quando o card do Sumário está expandido, ignorar validações obrigatórias
+    // para permitir abrir e salvar o Sumário mesmo com campos em branco.
+    // O Sumário é completamente opcional e não deve bloquear o envio do formulário.
+    if (isNavigatingToSummary || isSummaryExpanded) {
+      return true;
+    }
+
+    // Campos obrigatórios apenas até o card "Sumário"
     const requiredFields = [
       'nomeEmpresa', 'nomeProjeto', 'responsavelNome', 'responsavelEmail',
       'areaDepartamento', 'estiloLinguagem', 'tipoElementoEducacional',
-      'publicoCargo', 'escolaridade', 'dominioTecnico', 'quantidadeSecoes'
+      'publicoCargo', 'escolaridade', 'dominioTecnico'
     ];
     
     for (const field of requiredFields) {
@@ -539,8 +668,12 @@ export default function GuiaManual() {
       }
     }
     
+    // Se estiver navegando para o Sumário, não precisa validar os campos abaixo
+    // (mantido apenas por clareza do fluxo geral; já retornamos acima)
+    
+    // Validação para envio completo do formulário
     const numSecoes = parseInt(formData.quantidadeSecoes);
-    if (isNaN(numSecoes) || numSecoes < 1 || numSecoes > 50) {
+    if (isNaN(numSecoes) || (numSecoes < 1 && numSecoes !== 0) || numSecoes > 50) {
       return false;
     }
     
@@ -577,6 +710,8 @@ export default function GuiaManual() {
     }
   };
 
+  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -592,13 +727,16 @@ export default function GuiaManual() {
       return;
     }
 
-    // Validar arquivos antes de enviar
-    try {
-      validateFiles();
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Erro na validação dos arquivos.');
-      setShowErrorModal(true);
-      return;
+    // Se estiver navegando para o Sumário, não precisa validar os arquivos
+    if (!isNavigatingToSummary) {
+      // Validar arquivos antes de enviar
+      try {
+        validateFiles();
+      } catch (error) {
+        setSubmitError(error instanceof Error ? error.message : 'Erro na validação dos arquivos.');
+        setShowErrorModal(true);
+        return;
+      }
     }
     
     setIsSubmitting(true)
@@ -615,6 +753,8 @@ export default function GuiaManual() {
         user_email: user.email,
         status: 'aguardando_ingestao',
         form_data: formData,
+        // Incluir dados do sumário se existirem
+        ...(summaryDataPayload && { summary_data: summaryDataPayload }),
         ...(originalProjectId && { origin_id: originalProjectId })
       };
 
@@ -685,8 +825,14 @@ export default function GuiaManual() {
 
       setSubmitProgress('Finalizando...');
       
-      // 4. Sucesso - exibir modal de confirmação
-      setShowSuccessModal(true);
+      // 4. Sucesso - verificar se precisa expandir o Sumário
+      if (isNavigatingToSummary) {
+        setIsNavigatingToSummary(false);
+        setIsSummaryExpanded(true);
+      } else {
+        // Exibir modal de confirmação apenas se não estiver navegando para Sumário
+        setShowSuccessModal(true);
+      }
 
     } catch (error) {
       console.error('Erro no envio:', error);
@@ -1036,6 +1182,56 @@ export default function GuiaManual() {
             </div>
           </div>
 
+          {/* Sumário */}
+          <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 flex items-center justify-center rounded-full bg-[rgba(122,76,224,0.12)]">
+                <FileText className="w-5 h-5 text-[#7A4CE0]" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-800">Sumário</h2>
+            </div>
+            <div className="flex items-center justify-start">
+              {!isSummaryExpanded ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Apenas expande o Sumário sem validar o formulário
+                    setIsSummaryExpanded(true);
+                  }}
+                  className="px-4 py-2 border-2 border-[#7A4CE0] text-[#7A4CE0] rounded-lg font-medium text-sm transition-all duration-200 ease-in-out hover:bg-[rgba(122,76,224,0.05)] focus:outline-none focus:ring-2 focus:ring-[#7A4CE0] focus:ring-opacity-50"
+                >
+                  Criar Sumário
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSummaryExpanded(false)}
+                  className="px-4 py-2 border-2 border-gray-400 text-gray-600 rounded-lg font-medium text-sm transition-all duration-200 ease-in-out hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+            
+            {/* Conteúdo do Sumário (Accordion) */}
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
+              isSummaryExpanded ? 'max-h-[2000px] opacity-100 mt-6' : 'max-h-0 opacity-0'
+            }`}>
+              {isSummaryExpanded && (
+                <div className="border-t border-gray-200 pt-6">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800">Estrutura do Sumário</h3>
+                  </div>
+                  <SummaryBuilder 
+                    items={summaryItems}
+                    setItems={setSummaryItems}
+                    onDataChange={handleSummaryDataChange}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* 5. Quantidade de Seções */}
           <div className="form-card bg-white rounded-2xl border border-gray-100 pt-6 pb-8 px-8 my-5 mt-10">
             <div className="flex items-center gap-2 mb-4">
@@ -1049,23 +1245,31 @@ export default function GuiaManual() {
                 <label htmlFor="quantidadeSecoes" className="block text-sm font-medium text-gray-700 mb-3">Quantidade de Seções:</label>
                 <div className="relative">
                   <div className="flex justify-center mb-2">
+                  {(isAutoSections || Number(formData.quantidadeSecoes) === 0) ? (
+                    <Tooltip content="Definido pela IA automaticamente">
+                      <div className="bg-[rgba(122,76,224,0.12)] text-[#7A4CE0] px-[18px] py-[10px] rounded-full font-semibold text-lg min-w-[60px] text-center shadow-[0_2px_8px_rgba(122,76,224,0.25)] cursor-help">
+                        A
+                      </div>
+                    </Tooltip>
+                  ) : (
                     <div className="bg-[rgba(122,76,224,0.12)] text-[#7A4CE0] px-[18px] py-[10px] rounded-full font-semibold text-lg min-w-[60px] text-center shadow-[0_2px_8px_rgba(122,76,224,0.25)]">
-                      {formData.quantidadeSecoes || 1}
+                      {Number(formData.quantidadeSecoes) || 1}
                     </div>
-                  </div>
+                  )}
+                </div>
                   <div className="relative">
                     <input
                       type="range"
                       id="quantidadeSecoes"
                       name="quantidadeSecoes"
-                      value={formData.quantidadeSecoes || 1}
-                      onChange={handleInputChange}
-                      min="1"
+                      value={isAutoSections ? 0 : (formData.quantidadeSecoes || 1)}
+                      onChange={handleSectionsChange}
+                      min="0"
                       max="20"
                       required
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                       style={{
-                        background: `linear-gradient(to right, #7A4CE0 0%, #7A4CE0 ${((Number(formData.quantidadeSecoes) || 1) - 1) * 100 / 19}%, #E5E5E5 ${((Number(formData.quantidadeSecoes) || 1) - 1) * 100 / 19}%, #E5E5E5 100%)`
+                        background: `linear-gradient(to right, #7A4CE0 0%, #7A4CE0 ${isAutoSections ? 0 : ((Number(formData.quantidadeSecoes) || 1) * 100 / 20)}%, #E5E5E5 ${isAutoSections ? 0 : ((Number(formData.quantidadeSecoes) || 1) * 100 / 20)}%, #E5E5E5 100%)`
                       }}
                     />
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -1077,22 +1281,32 @@ export default function GuiaManual() {
                     </div>
                   </div>
                 </div>
-                <p className="text-sm text-gray-500 mt-3 text-center">Arraste para selecionar a quantidade de seções</p>
+                <p className="text-sm text-gray-500 mt-3 text-center">
+                  {!isAutoSections && 'Arraste para selecionar a quantidade de seções'}
+                </p>
               </div>
               <div>
                 <label htmlFor="numeroPaginas" className="block text-sm font-medium text-gray-700 mb-3">Número Máximo de Laudas:</label>
                 <div className="relative">
                   <div className="flex justify-center mb-2">
+                  {(isAutoPages || Number(formData.numeroPaginas) === 0) ? (
+                    <Tooltip content="Definido pela IA automaticamente">
+                      <div className="bg-[rgba(122,76,224,0.12)] text-[#7A4CE0] px-[18px] py-[10px] rounded-full font-semibold text-lg min-w-[60px] text-center shadow-[0_2px_8px_rgba(122,76,224,0.25)] cursor-help">
+                        A
+                      </div>
+                    </Tooltip>
+                  ) : (
                     <div className="bg-[rgba(122,76,224,0.12)] text-[#7A4CE0] px-[18px] py-[10px] rounded-full font-semibold text-lg min-w-[60px] text-center shadow-[0_2px_8px_rgba(122,76,224,0.25)]">
                       {Number(formData.numeroPaginas) || getLaudasRange(formData.tipoElementoEducacional).min}
                     </div>
-                  </div>
+                  )}
+                </div>
                   <div className="relative">
                     {
                       (() => {
                         const { min, max } = getLaudasRange(formData.tipoElementoEducacional);
-                        const current = Number(formData.numeroPaginas) || min;
-                        const percent = ((current - min) * 100) / (max - min);
+                        const current = isAutoPages ? 0 : (Number(formData.numeroPaginas) || min);
+                        const percent = isAutoPages ? 0 : (current * 100) / max;
                         const marks = [min, Math.round(min + (max - min) * 0.25), Math.round(min + (max - min) * 0.5), Math.round(min + (max - min) * 0.75), max];
                         return (
                           <>
@@ -1101,8 +1315,8 @@ export default function GuiaManual() {
                               id="numeroPaginas"
                               name="numeroPaginas"
                               value={current}
-                              onChange={handleInputChange}
-                              min={min}
+                              onChange={handlePagesChange}
+                              min="0"
                               max={max}
                               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                               style={{
@@ -1120,7 +1334,9 @@ export default function GuiaManual() {
                     }
                   </div>
                 </div>
-                <p className="text-sm text-gray-500 mt-2 text-center">Selecione a quantidade aproximada de laudas desejadas para o conteúdo.</p>
+                <p className="text-sm text-gray-500 mt-2 text-center">
+                  {!isAutoPages && 'Selecione a quantidade aproximada de laudas desejadas para o conteúdo.'}
+                </p>
               </div>
             </div>
           </div>
@@ -1262,21 +1478,33 @@ export default function GuiaManual() {
             <div className="bg-white p-8 rounded-lg max-w-md mx-4">
               <div className="text-center">
                 <CheckCircle className="w-16 h-16 mx-auto mb-4" style={{color: '#5f4a8c'}} />
-                <h3 className="text-xl font-semibold mb-2">Briefing Enviado!</h3>
+                <h3 className="text-xl font-semibold mb-2">
+                  {successMessage ? 'Operação Concluída!' : 'Briefing Enviado!'}
+                </h3>
                 <p className="text-gray-600 mb-4">
-                  Seu projeto "{formData.nomeProjeto}" foi criado com sucesso e está aguardando processamento.
+                  {successMessage || `Seu projeto "${formData.nomeProjeto}" foi criado com sucesso e está aguardando processamento.`}
                 </p>
-                {formData.anexos.length > 0 && (
-                  <p className="text-sm text-gray-500 mb-4">
-                    {formData.anexos.length} arquivo{formData.anexos.length > 1 ? 's' : ''} enviado{formData.anexos.length > 1 ? 's' : ''} com sucesso.
-                  </p>
-                )}
-                <button
-                  onClick={handleSuccessClose}
-                  className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-                >
-                  Voltar ao Início
-                </button>
+                  {successMessage && (
+                    <button
+                      onClick={() => setShowSuccessModal(false)}
+                      className="bg-[#7A4CE0] text-white px-6 py-2 rounded-lg hover:bg-[#6B3FD0] transition-colors"
+                    >
+                      Fechar
+                    </button>
+                  )}
+                  {!successMessage && formData.anexos.length > 0 && (
+                    <p className="text-sm text-gray-500 mb-4">
+                      {formData.anexos.length} arquivo{formData.anexos.length > 1 ? 's' : ''} enviado{formData.anexos.length > 1 ? 's' : ''} com sucesso.
+                    </p>
+                  )}
+                  {!successMessage && (
+                    <button
+                      onClick={handleSuccessClose}
+                      className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors"
+                    >
+                      Voltar ao Início
+                    </button>
+                  )}
               </div>
             </div>
           </div>

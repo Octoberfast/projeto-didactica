@@ -1214,8 +1214,8 @@ export default function GuiaManual() {
             </div>
             
             {/* Conteúdo do Sumário (Accordion) */}
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${
-              isSummaryExpanded ? 'max-h-[2000px] opacity-100 mt-6' : 'max-h-0 opacity-0'
+            <div className={`transition-all duration-300 ease-in-out ${
+              isSummaryExpanded ? 'overflow-y-auto max-h-[70vh] opacity-100 mt-6' : 'overflow-hidden max-h-0 opacity-0'
             }`}>
               {isSummaryExpanded && (
                 <div className="border-t border-gray-200 pt-6">

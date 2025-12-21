@@ -41,7 +41,7 @@ export default function Profile() {
     }
 
     checkAuth()
-  }, [])
+  }, [navigate])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -98,7 +98,7 @@ export default function Profile() {
           navigate('/dashboard')
         }, 2000)
       }
-    } catch (err) {
+    } catch {
       setError('Erro inesperado. Tente novamente.')
     } finally {
       setLoading(false)

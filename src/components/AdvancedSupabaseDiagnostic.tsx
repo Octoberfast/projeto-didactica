@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 interface DiagnosticResult {
   test: string
   status: 'success' | 'error' | 'pending'
   message: string
-  details?: any
+  details?: Record<string, unknown>
   timestamp: string
 }
 
@@ -13,11 +13,11 @@ export const AdvancedSupabaseDiagnostic: React.FC = () => {
   const [results, setResults] = useState<DiagnosticResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
 
-  const addResult = (result: Omit<DiagnosticResult, 'timestamp'>) => {
+  const addResult = useCallback((result: Omit<DiagnosticResult, 'timestamp'>) => {
     setResults(prev => [...prev, { ...result, timestamp: new Date().toISOString() }])
-  }
+  }, [])
 
-  const runDiagnostics = async () => {
+  const runDiagnostics = useCallback(async () => {
     setIsRunning(true)
     setResults([])
 
@@ -277,11 +277,11 @@ export const AdvancedSupabaseDiagnostic: React.FC = () => {
     }
 
     setIsRunning(false)
-  }
+  }, [addResult])
 
   useEffect(() => {
     runDiagnostics()
-  }, [])
+  }, [runDiagnostics])
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">

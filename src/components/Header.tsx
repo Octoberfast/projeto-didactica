@@ -37,7 +37,7 @@ export default function Header() {
 
   const userName = user?.user_metadata?.name || 
     (user?.email ? formatEmailToName(user.email) : 'Usuário')
-  const isAdmin = user?.user_metadata?.role === 'admin'
+  // const isAdmin = user?.user_metadata?.role === 'admin' // Comentado: variável não utilizada atualmente
 
   return (
     <header className="w-full bg-white shadow-md sticky top-0 z-50">

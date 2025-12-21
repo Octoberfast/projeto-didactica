@@ -9,6 +9,7 @@ import FerramentasRevisao from './pages/FerramentasRevisao'
 import GuiaManual from './pages/GuiaManual'
 import ProtectedRoute from './components/ProtectedRoute'
 import Transcricao from './pages/Transcricao'
+import Sumario from './pages/Sumario'
 
 function App() {
   return (
@@ -62,6 +63,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Transcricao />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/sumario" 
+        element={
+          <ProtectedRoute>
+            <Sumario />
           </ProtectedRoute>
         } 
       />

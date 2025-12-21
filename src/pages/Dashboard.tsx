@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
@@ -17,7 +17,7 @@ interface ProjectRequest {
   user_email: string
   created_at: string
   origin_id?: string
-  form_data?: any
+  form_data?: Record<string, unknown>
 }
 
 interface DashboardFilters {
@@ -40,6 +40,29 @@ export default function Dashboard() {
     sortOrder: 'desc'
   })
 
+  const fetchProjects = useCallback(async (userEmail: string) => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('project_requests')
+        .select('*')
+        .eq('user_email', userEmail)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        throw error
+      }
+
+      setProjects(data || [])
+      setFilteredProjects(data || [])
+    } catch (err) {
+      console.error('Erro ao buscar projetos:', err)
+      setError('Erro ao carregar projetos. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     // Protect this route - require authentication
     const checkAuth = async () => {
@@ -52,10 +75,10 @@ export default function Dashboard() {
       await fetchProjects(session.user.email!)
     }
     checkAuth()
-  }, [])
+  }, [fetchProjects])
 
   // Função reutilizável de sincronização: marca 'concluido' em project_requests com base em transcriptions_meta
-  const syncConclusions = async () => {
+  const syncConclusions = useCallback(async () => {
     if (!user?.id || !user?.email) return
     try {
       const { data: concluidas, error } = await supabase
@@ -67,7 +90,7 @@ export default function Dashboard() {
       if (error) throw error
 
       if (concluidas && concluidas.length > 0) {
-        const updates = concluidas.map(async (row: any) => {
+        const updates = concluidas.map(async (row: { empresa: string; projeto: string }) => {
           const { error: updErr } = await supabase
             .from('project_requests')
             .update({ status: 'concluido' })
@@ -87,7 +110,7 @@ export default function Dashboard() {
     } catch (e) {
       console.error('Erro na sincronização de status:', e)
     }
-  }
+  }, [user?.id, user?.email, fetchProjects])
 
   // Assinar atualizações de status na tabela transcriptions_meta
   useEffect(() => {
@@ -101,7 +124,7 @@ export default function Dashboard() {
         table: 'transcriptions_meta',
         filter: `user_id=eq.${user.id}`,
       }, async (payload) => {
-        const newRow = payload.new as any
+        const newRow = payload.new as { status: string; empresa: string; projeto: string }
         // Atualizar project_requests somente quando transcriptions_meta.status === 'concluido'
         if (newRow?.status === 'concluido') {
           try {
@@ -129,13 +152,13 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, user?.email])
+  }, [user?.id, user?.email, syncConclusions, fetchProjects])
 
   // Sincronização inicial (dentro do componente): refletir transcrições já concluídas
   useEffect(() => {
     if (!user?.id || !user?.email) return
     syncConclusions()
-  }, [user?.id, user?.email])
+  }, [user?.id, user?.email, syncConclusions])
 
   // Fallback de sincronização: tenta periodicamente por até 2 minutos
   useEffect(() => {
@@ -172,30 +195,7 @@ export default function Dashboard() {
     }, intervalMs)
 
     return () => clearInterval(intervalId)
-  }, [user?.id, user?.email])
-
-  const fetchProjects = async (userEmail: string) => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('project_requests')
-        .select('*')
-        .eq('user_email', userEmail)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        throw error
-      }
-
-      setProjects(data || [])
-      setFilteredProjects(data || [])
-    } catch (err) {
-      console.error('Erro ao buscar projetos:', err)
-      setError('Erro ao carregar projetos. Tente novamente.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user?.id, user?.email, syncConclusions])
 
   // Função para reutilizar conteúdo
   const handleReuseContent = (project: ProjectRequest) => {
@@ -204,7 +204,7 @@ export default function Dashboard() {
   }
 
   // Função para aplicar filtros e ordenação
-  const applyFiltersAndSort = () => {
+  const applyFiltersAndSort = useCallback(() => {
     let filtered = projects
 
     // Aplicar filtro por status
@@ -233,12 +233,12 @@ export default function Dashboard() {
     })
 
     setFilteredProjects(filtered)
-  }
+  }, [filters, projects])
 
   // Aplicar filtros quando os valores mudarem
   useEffect(() => {
     applyFiltersAndSort()
-  }, [filters, projects])
+  }, [filters, projects, applyFiltersAndSort])
 
   const handleFilterChange = (newFilters: Partial<DashboardFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }))

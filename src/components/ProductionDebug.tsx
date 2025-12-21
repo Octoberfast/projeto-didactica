@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 const ProductionDebug: React.FC = () => {
-  const [debugInfo, setDebugInfo] = useState<any>({})
-  const [testResults, setTestResults] = useState<any>({})
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown>>({})
+  const [testResults, setTestResults] = useState<Record<string, unknown>>({})
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -24,7 +24,7 @@ const ProductionDebug: React.FC = () => {
 
   const testSupabaseConnection = async () => {
     setLoading(true)
-    const results: any = {}
+    const results: Record<string, unknown> = {}
 
     try {
       // Teste 1: Verificar se o cliente Supabase foi inicializado
@@ -44,10 +44,10 @@ const ProductionDebug: React.FC = () => {
           error: error?.message,
           data: data
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.basicQuery = {
           success: false,
-          error: err.message
+          error: (err as Error).message
         }
       }
 
@@ -59,10 +59,10 @@ const ProductionDebug: React.FC = () => {
           error: error?.message,
           hasSession: !!data.session
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.authTest = {
           success: false,
-          error: err.message
+          error: (err as Error).message
         }
       }
 
@@ -73,8 +73,8 @@ const ProductionDebug: React.FC = () => {
         VITE_SUPABASE_ANON_KEY_LENGTH: import.meta.env.VITE_SUPABASE_ANON_KEY?.length || 0
       }
 
-    } catch (err: any) {
-      results.generalError = err.message
+    } catch (err: unknown) {
+      results.generalError = (err as Error).message
     }
 
     setTestResults(results)

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 export default function SupabaseDebug() {
-  const [debugInfo, setDebugInfo] = useState<any>({})
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown>>({})
   const [testResult, setTestResult] = useState<string>('')
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export default function SupabaseDebug() {
       setTestResult('Testando conexão...')
       
       // Test basic connection
-      const { data, error } = await supabase.from('project_requests').select('count', { count: 'exact', head: true })
+      const { error } = await supabase.from('project_requests').select('count', { count: 'exact', head: true })
       
       if (error) {
         setTestResult(`Erro de conexão: ${error.message}`)

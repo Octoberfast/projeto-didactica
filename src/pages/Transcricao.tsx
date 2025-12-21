@@ -300,8 +300,8 @@ export default function Transcricao() {
         upload.resumeFromPreviousUpload(previousUploads[0])
       }
       upload.start()
-    } catch (err: any) {
-      const message = err?.message || 'Ocorreu um erro ao enviar o arquivo.'
+    } catch (err: unknown) {
+      const message = (err as Error)?.message || 'Ocorreu um erro ao enviar o arquivo.'
       let friendly = message
       if (message.toLowerCase().includes('rls') || message.includes('row-level security')) {
         friendly = 'As políticas de segurança (RLS) do Storage estão bloqueando o upload. Crie uma política de INSERT para usuários autenticados no bucket "transcriptions".'

@@ -87,7 +87,7 @@ export default function ChangePassword() {
           navigate('/login')
         }, 2000)
       }
-    } catch (err) {
+    } catch {
       setError('Ocorreu um erro inesperado. Tente novamente.')
     } finally {
       setLoading(false)

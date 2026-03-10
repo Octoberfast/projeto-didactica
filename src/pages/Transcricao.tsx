@@ -197,6 +197,14 @@ export default function Transcricao() {
       const supabaseProjectUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
       const tusEndpoint = `${supabaseProjectUrl}/storage/v1/upload/resumable`
 
+      console.log('[TUS] Iniciando upload', {
+        endpoint: tusEndpoint,
+        path,
+        fileSize: file.size,
+        fileType: file.type,
+        hasToken: !!session?.access_token,
+      })
+
       const upload = new tus.Upload(file, {
         endpoint: tusEndpoint,
         retryDelays: [0, 3000, 5000, 10000, 20000],
@@ -215,6 +223,7 @@ export default function Transcricao() {
         },
         chunkSize: 6 * 1024 * 1024,
         onError: (err) => {
+          console.error('[TUS] Erro no upload:', err)
           const message = err?.message || 'Erro no upload resumível.'
           setError(message)
           setUploadStatus('error')
@@ -226,6 +235,7 @@ export default function Transcricao() {
         },
         onProgress: (bytesUploaded, bytesTotal) => {
           const percentage = Math.floor((bytesUploaded / bytesTotal) * 100)
+          console.log(`[TUS] Progresso: ${percentage}% (${bytesUploaded}/${bytesTotal})`)
           setUploadProgress(percentage)
           const now = Date.now()
           const startTs = uploadStartTimeRef.current
@@ -240,6 +250,7 @@ export default function Transcricao() {
           }
         },
         onSuccess: async () => {
+          console.log('[TUS] Upload concluído com sucesso')
           // Inserir metadados
           try {
             await supabase
@@ -296,14 +307,22 @@ export default function Transcricao() {
           setUploadStartTime(null)
           uploadStartTimeRef.current = null
         },
+        onShouldRetry: (err, retryAttempt, _options) => {
+          console.warn(`[TUS] Tentativa de retry #${retryAttempt}:`, err)
+          return true
+        },
+        onBeforeRequest: (req) => {
+          console.log(`[TUS] Request: ${req.getMethod()} ${req.getURL()}`)
+        },
+        onAfterResponse: (_req, res) => {
+          console.log(`[TUS] Response: ${res.getStatus()}`, {
+            headers: res.getHeader('tus-resumable') || 'n/a',
+          })
+        },
       })
 
       tusRef.current = upload
-
-      const previousUploads = await upload.findPreviousUploads()
-      if (previousUploads.length) {
-        upload.resumeFromPreviousUpload(previousUploads[0])
-      }
+      console.log('[TUS] Chamando upload.start()')
       upload.start()
     } catch (err: unknown) {
       const message = (err as Error)?.message || 'Ocorreu um erro ao enviar o arquivo.'

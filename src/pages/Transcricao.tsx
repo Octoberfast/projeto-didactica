@@ -11,6 +11,61 @@ interface FormState {
   nomeProjeto: string
 }
 
+const MEDIA_EXTENSIONS = new Set([
+  'mp3', 'wav', 'm4a', 'aac', 'ogg', 'opus', 'flac',
+  'mp4', 'mov', 'avi', 'mkv', 'webm', 'mpeg', 'mpg', 'm3u8'
+])
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  webm: 'video/webm',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime'
+}
+
+const getFileExtension = (name: string): string => {
+  const parts = name.toLowerCase().split('.')
+  return parts.length > 1 ? parts[parts.length - 1] : ''
+}
+
+const getNormalizedMimeType = (f: File): string => {
+  if (f.type) return f.type
+  const extension = getFileExtension(f.name)
+  return MIME_BY_EXTENSION[extension] || 'application/octet-stream'
+}
+
+const getTusStatusCode = (err: unknown): number | null => {
+  const status = (err as { originalResponse?: { getStatus?: () => number } })?.originalResponse?.getStatus?.()
+  return typeof status === 'number' ? status : null
+}
+
+const getFriendlyUploadError = (err: unknown): string => {
+  const status = getTusStatusCode(err)
+  const rawMessage = (err as Error)?.message || 'Erro no upload resumível.'
+  const lower = rawMessage.toLowerCase()
+
+  if (status === 401 || status === 403 || lower.includes('forbidden') || lower.includes('unauthorized')) {
+    return 'Sua sessão expirou ou não possui permissão para upload. Faça login novamente e tente de novo.'
+  }
+  if (status === 400 && (lower.includes('mime') || lower.includes('content type') || lower.includes('content-type'))) {
+    return 'O tipo de arquivo não foi aceito pelo Storage. Se o bucket tiver allowed_mime_types, inclua "video/webm" e "audio/webm".'
+  }
+  if (status === 413 || lower.includes('too large') || lower.includes('payload too large')) {
+    return 'Arquivo muito grande para o limite configurado no Storage.'
+  }
+  return rawMessage
+}
+
+const shouldRetryTusUpload = (err: unknown, retryAttempt: number): boolean => {
+  const status = getTusStatusCode(err)
+  if (status && status >= 400 && status < 500 && ![409, 423, 429].includes(status)) {
+    return false
+  }
+  return retryAttempt < 5
+}
+
 export default function Transcricao() {
   const [form, setForm] = useState<FormState>({ nomeEmpresa: '', nomeProjeto: '' })
   const [file, setFile] = useState<File | null>(null)
@@ -20,10 +75,8 @@ export default function Transcricao() {
   const [isDragging, setIsDragging] = useState<boolean>(false)
   const [uploadProgress, setUploadProgress] = useState<number>(0)
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
-  // velocidade e ETA
   const [uploadSpeedMBps, setUploadSpeedMBps] = useState<number>(0)
   const [uploadEtaSeconds, setUploadEtaSeconds] = useState<number>(0)
-  const [uploadStartTime, setUploadStartTime] = useState<number | null>(null)
   const uploadStartTimeRef = useRef<number | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const tusRef = useRef<TusUpload | null>(null)
@@ -54,8 +107,11 @@ export default function Transcricao() {
 
   const validateFile = (f: File): string | null => {
     const MAX_BYTES = 2 * 1024 * 1024 * 1024 // 2GB
+    const extension = getFileExtension(f.name)
+    const hasMediaMime = f.type.startsWith('audio/') || f.type.startsWith('video/')
+    const hasAllowedExtension = MEDIA_EXTENSIONS.has(extension)
     if (!f) return 'Selecione um arquivo de áudio ou vídeo.'
-    if (!f.type.startsWith('audio/') && !f.type.startsWith('video/')) {
+    if (!hasMediaMime && !hasAllowedExtension) {
       return 'Formato inválido. Aceitamos apenas arquivos de áudio ou vídeo.'
     }
     if (f.size > MAX_BYTES) {
@@ -170,7 +226,6 @@ export default function Transcricao() {
     setUploadStatus('uploading')
     setUploadProgress(0)
     const startTime = Date.now()
-    setUploadStartTime(startTime)
     uploadStartTimeRef.current = startTime
     setUploadSpeedMBps(0)
     setUploadEtaSeconds(0)
@@ -205,6 +260,8 @@ export default function Transcricao() {
         hasToken: !!session?.access_token,
       })
 
+      const contentType = getNormalizedMimeType(file)
+
       const upload = new tus.Upload(file, {
         endpoint: tusEndpoint,
         retryDelays: [0, 3000, 5000, 10000, 20000],
@@ -217,20 +274,19 @@ export default function Transcricao() {
         metadata: {
           bucketName: 'transcriptions',
           objectName: path,
-          contentType: file.type,
+          contentType,
           cacheControl: '3600',
           metadata: JSON.stringify({ user_id: user.id }),
         },
         chunkSize: 6 * 1024 * 1024,
         onError: (err) => {
           console.error('[TUS] Erro no upload:', err)
-          const message = err?.message || 'Erro no upload resumível.'
+          const message = getFriendlyUploadError(err)
           setError(message)
           setUploadStatus('error')
           setIsSubmitting(false)
           setUploadSpeedMBps(0)
           setUploadEtaSeconds(0)
-          setUploadStartTime(null)
           uploadStartTimeRef.current = null
         },
         onProgress: (bytesUploaded, bytesTotal) => {
@@ -262,7 +318,7 @@ export default function Transcricao() {
                 storage_path: path,
                 file_name: file.name,
                 size: file.size,
-                mime_type: file.type,
+                mime_type: contentType,
                 bucket: 'transcriptions',
                 status: 'pendente',
               })
@@ -304,12 +360,11 @@ export default function Transcricao() {
           setForm({ nomeEmpresa: '', nomeProjeto: '' })
           setUploadSpeedMBps(0)
           setUploadEtaSeconds(0)
-          setUploadStartTime(null)
           uploadStartTimeRef.current = null
         },
-        onShouldRetry: (err, retryAttempt, _options) => {
+        onShouldRetry: (err, retryAttempt) => {
           console.warn(`[TUS] Tentativa de retry #${retryAttempt}:`, err)
-          return true
+          return shouldRetryTusUpload(err, retryAttempt)
         },
         onBeforeRequest: (req) => {
           console.log(`[TUS] Request: ${req.getMethod()} ${req.getURL()}`)
@@ -334,6 +389,10 @@ export default function Transcricao() {
       }
       setError(friendly)
       setUploadStatus('error')
+      setIsSubmitting(false)
+      setUploadSpeedMBps(0)
+      setUploadEtaSeconds(0)
+      uploadStartTimeRef.current = null
     } finally {
       // isSubmitting é atualizado nos handlers
     }

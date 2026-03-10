@@ -4,18 +4,49 @@ import type { User } from '@supabase/supabase-js'
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    // Get current user
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
-    })
+    // Get current user and check admin status
+    const checkUser = async () => {
+       const { data: { user } } = await supabase.auth.getUser()
+       setUser(user)
+       
+       if (user) {
+         console.log('Verificando status de admin para usuário:', user.id)
+         const { data: profile, error } = await supabase
+           .from('profiles')
+           .select('role')
+           .eq('id', user.id)
+           .single()
+         
+         if (error) {
+           console.error('Erro ao verificar perfil de admin:', error)
+         } else {
+           console.log('Perfil encontrado:', profile)
+         }
+         
+         setIsAdmin(profile?.role === 'admin')
+       }
+     }
+    
+    checkUser()
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) {
+         const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        setIsAdmin(profile?.role === 'admin')
+      } else {
+        setIsAdmin(false)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -53,6 +84,12 @@ export default function Header() {
           <span className="text-gray-700 font-medium">
             Bem-vindo(a), <span id="userName">{userName}</span>!
           </span>
+          {isAdmin && (
+            <a href="/admin" className="bg-gray-800 text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 hover:bg-opacity-90 transition-colors">
+              <i className="fas fa-users-cog"></i>
+              Admin
+            </a>
+          )}
           <a href="/dashboard" className="bg-custom-purple text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 hover:bg-opacity-90 transition-colors">
             <i className="fas fa-tachometer-alt"></i>
             Dashboard

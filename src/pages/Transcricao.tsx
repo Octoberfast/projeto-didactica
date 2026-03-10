@@ -24,6 +24,7 @@ export default function Transcricao() {
   const [uploadSpeedMBps, setUploadSpeedMBps] = useState<number>(0)
   const [uploadEtaSeconds, setUploadEtaSeconds] = useState<number>(0)
   const [uploadStartTime, setUploadStartTime] = useState<number | null>(null)
+  const uploadStartTimeRef = useRef<number | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const tusRef = useRef<TusUpload | null>(null)
 
@@ -168,7 +169,9 @@ export default function Transcricao() {
     setIsSubmitting(true)
     setUploadStatus('uploading')
     setUploadProgress(0)
-    setUploadStartTime(Date.now())
+    const startTime = Date.now()
+    setUploadStartTime(startTime)
+    uploadStartTimeRef.current = startTime
     setUploadSpeedMBps(0)
     setUploadEtaSeconds(0)
 
@@ -190,10 +193,9 @@ export default function Transcricao() {
       const fileSlug = sanitize(file.name)
       const path = `${user.id}/${projectSlug}/${timestamp}-${fileSlug}`
 
-      // Configurar endpoint TUS usando direct storage hostname
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-      const projectRef = supabaseUrl?.match(/^https?:\/\/([^.]+)\./)?.[1] || ''
-      const tusEndpoint = `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`
+      // Configurar endpoint TUS usando URL padrão do Supabase
+      const supabaseProjectUrl = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
+      const tusEndpoint = `${supabaseProjectUrl}/storage/v1/upload/resumable`
 
       const upload = new tus.Upload(file, {
         endpoint: tusEndpoint,
@@ -220,12 +222,14 @@ export default function Transcricao() {
           setUploadSpeedMBps(0)
           setUploadEtaSeconds(0)
           setUploadStartTime(null)
+          uploadStartTimeRef.current = null
         },
         onProgress: (bytesUploaded, bytesTotal) => {
           const percentage = Math.floor((bytesUploaded / bytesTotal) * 100)
           setUploadProgress(percentage)
           const now = Date.now()
-          const elapsedSec = uploadStartTime ? (now - uploadStartTime) / 1000 : 0
+          const startTs = uploadStartTimeRef.current
+          const elapsedSec = startTs ? (now - startTs) / 1000 : 0
           if (elapsedSec > 0) {
             const speedBps = bytesUploaded / elapsedSec
             const mbps = speedBps / (1024 * 1024)
@@ -290,6 +294,7 @@ export default function Transcricao() {
           setUploadSpeedMBps(0)
           setUploadEtaSeconds(0)
           setUploadStartTime(null)
+          uploadStartTimeRef.current = null
         },
       })
 
